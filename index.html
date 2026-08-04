@@ -1,0 +1,2515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>OR Opener — Preoperative Readiness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#F3F7F6; --surface:#FFFFFF; --surface-alt:#E9F1EF; --line:#D7E3E0;
+    --ink:#10262B; --ink-soft:#5B6E70; --ink-faint:#8CA0A0;
+    --teal:#1F6F78; --teal-deep:#123B41; --teal-soft:#DCEEEC;
+    --green:#2F8F5B; --green-soft:#E2F3E8; --amber:#C7752B; --amber-soft:#FBEADC;
+    --gray:#8B9A98; --gray-soft:#EDF1F0; --danger:#C4432E; --danger-soft:#F7E1DC;
+    --radius:14px; --radius-sm:8px;
+    --shadow:0 1px 2px rgba(16,38,43,0.06), 0 8px 24px -12px rgba(16,38,43,0.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{ background:var(--bg); color:var(--ink); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh; }
+  h1,h2,h3{font-family:'Space Grotesk',sans-serif; margin:0;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  #app{ width:100%; max-width:1600px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; background:var(--bg); }
+
+  /* ---------- Topbar ---------- */
+  .topbar{ background:var(--teal-deep); color:#fff; padding:20px 20px 0 20px; position:sticky; top:0; z-index:20; box-shadow:0 4px 20px rgba(0,0,0,0.15); }
+  .topbar-row{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:14px; flex-wrap:wrap; }
+  .topbar-title{ display:flex; flex-direction:column; gap:2px; }
+  .eyebrow{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#8FD3CE; font-weight:600; }
+  .topbar-title h1{ font-size:20px; font-weight:700; letter-spacing:-.01em;}
+  .gauge-wrap{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .gauge-num{ text-align:right; }
+  .gauge-num .pct{ font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700; line-height:1;}
+  .gauge-num .lbl{ font-size:10px; color:#9FC9C5; text-transform:uppercase; letter-spacing:.1em;}
+  .user-badge{ display:flex; align-items:center; gap:10px; }
+  .user-badge .who{ text-align:right; }
+  .user-badge .who .n{ font-size:13.5px; font-weight:700; }
+  .user-badge .who .r{ font-size:10px; color:#9FC9C5; text-transform:uppercase; letter-spacing:.08em; }
+  .logout-btn{ background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.25); border-radius:8px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; }
+  .heartline{ height:14px; overflow:hidden; }
+  .heartline svg{ width:100%; height:100%; display:block; }
+  .heartline path{ fill:none; stroke:#3F9C93; stroke-width:1.4; stroke-linecap:round; stroke-linejoin:round; opacity:0.55; }
+
+  /* ---------- Tabs ---------- */
+  .tabs{ display:flex; gap:4px; background:var(--teal-deep); padding:0 20px 12px 20px; }
+  .tab-btn{ background:rgba(255,255,255,0.07); color:#BFE0DC; border:none; padding:9px 16px; border-radius:9px 9px 0 0; font-size:13px; font-weight:600; cursor:pointer; font-family:'Space Grotesk',sans-serif; }
+  .tab-btn.active{ background:var(--bg); color:var(--teal-deep); }
+
+  /* ---------- Stepper ---------- */
+  .stepper{ display:flex; gap:6px; overflow-x:auto; padding:12px 20px; background:var(--surface-alt); scrollbar-width:none; border-bottom:1px solid var(--line); }
+  .stepper::-webkit-scrollbar{ display:none; }
+  .step-pill{ flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:7px 12px; border-radius:999px; background:#fff; border:1px solid var(--line); color:var(--ink-soft); font-size:12px; font-weight:600; white-space:nowrap; cursor:pointer; }
+  .step-pill .dot{ width:7px; height:7px; border-radius:50%; background:var(--gray); flex-shrink:0; }
+  .step-pill.done{ background:var(--green-soft); border-color:var(--green); color:var(--teal-deep); }
+  .step-pill.done .dot{ background:var(--green); }
+  .step-pill.active{ background:var(--teal); border-color:var(--teal); color:#fff; }
+  .step-pill.active .dot{ background:#fff; }
+  .step-pill.flag .dot{ background:var(--amber); }
+  .step-pill.locked{ opacity:0.4; cursor:not-allowed; }
+
+  /* ---------- Content ---------- */
+  main{ flex:1; padding:22px 20px 120px 20px; }
+  .section-head{ margin-bottom:4px; }
+  .section-head h2{ font-size:19px; font-weight:700; }
+  .section-note{ font-size:12.5px; color:var(--ink-soft); margin-top:6px; background:var(--surface-alt); border-left:3px solid var(--teal); padding:8px 10px; border-radius:0 6px 6px 0; }
+  .section-sub{ font-size:13px; color:var(--ink-soft); margin-top:6px; margin-bottom:18px;}
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); margin-bottom:14px; }
+  .field-row{ display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+  .field-row label{ font-size:12.5px; font-weight:600; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em;}
+  .field-label-row{ display:flex; justify-content:space-between; align-items:center; }
+  select, input[type=date], input[type=text], input[type=number], textarea, input[type=time], input[type=file]{
+    font-family:'Inter',sans-serif; font-size:15px; padding:11px 12px; border-radius:var(--radius-sm); border:1.5px solid var(--line); background:#fff; color:var(--ink); width:100%;
+  }
+  select:focus, input:focus, textarea:focus{ outline:2px solid var(--teal); outline-offset:1px; border-color:var(--teal); }
+  input:disabled{ background:var(--gray-soft); color:var(--ink-faint); }
+  .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:680px){ .grid-2{ grid-template-columns:1fr; } }
+  .grid-3-wrap{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; align-items:start; }
+  @media (max-width:1100px){ .grid-3-wrap{ grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:680px){ .grid-3-wrap{ grid-template-columns:1fr; } }
+  .grid-3-wrap > .card{ margin-bottom:0; }
+
+  .check-item{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 4px; border-bottom:1px solid var(--line); }
+  .check-item:last-child{ border-bottom:none; }
+  .check-item .label{ font-size:14.5px; font-weight:500; flex:1; }
+  .status-group{ display:flex; gap:6px; flex-shrink:0; }
+  .status-btn{ border:1.5px solid var(--line); background:#fff; color:var(--ink-soft); font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; padding:8px 10px; border-radius:8px; cursor:pointer; min-width:44px; }
+  .status-btn.sel-done{ background:var(--green); border-color:var(--green); color:#fff; }
+  .status-btn.sel-na{ background:var(--gray); border-color:var(--gray); color:#fff; }
+  .status-btn.sel-biomed{ background:var(--amber); border-color:var(--amber); color:#fff; }
+
+  .yn-group{ display:flex; gap:8px; }
+  .yn-btn{ border:1.5px solid var(--line); background:#fff; color:var(--ink-soft); font-size:13px; font-weight:700; padding:9px 18px; border-radius:8px; cursor:pointer; }
+  .yn-btn.sel-yes{ background:var(--danger); border-color:var(--danger); color:#fff; }
+  .yn-btn.sel-no{ background:var(--green); border-color:var(--green); color:#fff; }
+
+  .chip-group{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{ border:1.5px solid var(--line); background:#fff; color:var(--ink-soft); font-size:13px; font-weight:600; padding:9px 14px; border-radius:999px; cursor:pointer; }
+  .chip.sel{ background:var(--teal); border-color:var(--teal); color:#fff; }
+  .chip-sm{ font-size:11px; padding:4px 10px; }
+
+  .gas-block{ margin-bottom:20px; }
+  .gas-block h3{ font-size:14.5px; color:var(--teal-deep); margin-bottom:10px; }
+
+  .summary-stats{ display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+  .stat{ flex:1; min-width:110px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm); padding:12px; text-align:center; }
+  .stat .n{ font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700; }
+  .stat .l{ font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin-top:2px;}
+  .stat.done .n{ color:var(--green); } .stat.na .n{ color:var(--gray); } .stat.biomed .n{ color:var(--amber); } .stat.pending .n{ color:var(--danger); }
+
+  .flag-list{ list-style:none; padding:0; margin:0; }
+  .flag-list li{ display:flex; justify-content:space-between; padding:9px 12px; border-radius:8px; background:var(--amber-soft); margin-bottom:6px; font-size:13.5px; }
+  .flag-list li span.section{ color:var(--ink-soft); font-size:12px; }
+  .empty-note{ font-size:13.5px; color:var(--ink-soft); padding:10px 0; }
+
+  .submit-btn{ width:100%; background:var(--teal); color:#fff; border:none; border-radius:12px; padding:15px; font-size:15px; font-weight:700; cursor:pointer; font-family:'Space Grotesk',sans-serif; }
+  .submit-btn:disabled{ background:var(--gray); cursor:not-allowed; }
+  .ghost-btn{ width:100%; background:none; border:1.5px solid var(--teal); color:var(--teal); border-radius:12px; padding:13px; font-size:14px; font-weight:700; cursor:pointer; font-family:'Space Grotesk',sans-serif; margin-top:10px; }
+  .confirm-box{ background:var(--green-soft); border:1.5px solid var(--green); border-radius:var(--radius); padding:18px; text-align:center; }
+  .confirm-box h3{ color:var(--teal-deep); margin-bottom:6px; }
+  .confirm-box p{ font-size:13px; color:var(--ink-soft); margin:4px 0; }
+  .json-toggle{ background:none; border:1.5px solid var(--line); border-radius:8px; padding:8px 12px; font-size:12.5px; cursor:pointer; color:var(--ink-soft); margin-top:10px; }
+  pre.json-out{ background:var(--teal-deep); color:#BFE0DC; padding:12px; border-radius:8px; font-size:11px; overflow-x:auto; margin-top:10px; max-height:260px; overflow-y:auto; }
+
+  .bottombar{ position:fixed; bottom:0; left:0; right:0; z-index:20; background:var(--surface); border-top:1px solid var(--line); box-shadow:0 -6px 20px rgba(16,38,43,0.08); }
+  .bottombar-inner{ width:100%; margin:0; padding:12px 20px; display:flex; align-items:center; justify-content:space-between; gap:10px; box-sizing:border-box; }
+  .nav-btn{ border:none; border-radius:10px; padding:12px 20px; font-size:14px; font-weight:700; cursor:pointer; font-family:'Space Grotesk',sans-serif; }
+  .nav-btn.prev{ background:var(--surface-alt); color:var(--teal-deep); }
+  .nav-btn.next{ background:var(--teal); color:#fff; }
+  .nav-btn:disabled{ opacity:0.35; cursor:not-allowed; }
+  .pos-label{ font-size:12px; color:var(--ink-soft); font-weight:600; text-align:center; }
+  .hint-incomplete{ font-size:10.5px; color:var(--danger); display:block; margin-top:2px; }
+
+  /* ---------- Login ---------- */
+  .login-wrap{ max-width:420px; margin:0 auto; }
+  .login-wrap-wide{ max-width:1080px; }
+  .login-wrap-medium{ max-width:760px; }
+  .entry-narrow{ max-width:760px; margin:0 auto; }
+  .missed-banner{ background:var(--amber-soft); border:1.5px solid var(--amber); border-radius:var(--radius); padding:14px; margin-bottom:20px; }
+  .missed-banner h3{ font-size:13.5px; color:var(--amber); display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+  .missed-row{ display:flex; justify-content:space-between; font-size:13px; padding:6px 0; border-bottom:1px dashed rgba(199,117,43,0.3); }
+  .missed-row:last-child{ border-bottom:none; }
+  .missed-row .d{ font-family:'IBM Plex Mono',monospace; font-weight:600; }
+  .name-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width:420px){ .name-grid{ grid-template-columns:1fr; } }
+  .name-btn{ background:var(--surface); border:1.5px solid var(--line); border-radius:var(--radius-sm); padding:16px 10px; font-size:14px; font-weight:600; text-align:center; cursor:pointer; box-shadow:var(--shadow); }
+  .name-btn:hover{ border-color:var(--teal); }
+  .pin-stage{ text-align:center; }
+  .pin-user{ font-size:16px; font-weight:700; margin-bottom:4px; }
+  .pin-sub{ font-size:12.5px; color:var(--ink-soft); margin-bottom:18px; }
+  .pin-dots{ display:flex; justify-content:center; gap:14px; margin-bottom:22px; }
+  .pin-dot{ width:16px; height:16px; border-radius:50%; border:2px solid var(--teal); background:transparent; }
+  .pin-dot.filled{ background:var(--teal); }
+  .pin-error{ color:var(--danger); font-size:13px; font-weight:600; margin-bottom:14px; min-height:18px; }
+  .keypad{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:260px; margin:0 auto; }
+  .key-btn{ background:var(--surface); border:1.5px solid var(--line); border-radius:12px; padding:16px 0; font-size:19px; font-weight:700; font-family:'Space Grotesk',sans-serif; cursor:pointer; box-shadow:var(--shadow); }
+  .key-btn:active{ background:var(--teal-soft); }
+  .key-btn.util{ font-size:13px; color:var(--ink-soft); }
+  .back-link{ display:inline-block; margin-top:18px; font-size:12.5px; color:var(--ink-soft); cursor:pointer; text-decoration:underline; }
+  .forgot-link{ display:block; text-align:center; margin-top:16px; font-size:12.5px; color:var(--teal); cursor:pointer; text-decoration:underline; }
+  .offer-card{ text-align:center; }
+  .offer-card p{ font-size:13.5px; color:var(--ink-soft); margin-bottom:18px; }
+  .btn-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .btn-row > *{ flex:1; min-width:130px; }
+  .btn-row .nav-btn{ flex:1; }
+
+  /* ---------- Admin / Dashboard ---------- */
+  .userlist{ display:flex; flex-direction:column; gap:8px; }
+  .user-row{ display:flex; align-items:center; gap:10px; padding:10px; border:1px solid var(--line); border-radius:10px; background:#fff; flex-wrap:wrap; }
+  .user-row .uname{ font-weight:700; font-size:13.5px; flex:1; min-width:110px; }
+  .user-row select{ width:auto; padding:6px 8px; font-size:12.5px; }
+  .badge{ font-size:10px; text-transform:uppercase; font-weight:700; letter-spacing:.04em; padding:3px 8px; border-radius:6px; }
+  .badge.default{ background:var(--amber-soft); color:var(--amber); }
+  .badge.custom{ background:var(--green-soft); color:var(--green); }
+  .mini-btn{ background:var(--surface-alt); border:1px solid var(--line); border-radius:7px; padding:6px 10px; font-size:11.5px; font-weight:600; cursor:pointer; color:var(--teal-deep); }
+  .kpi-note{ font-size:12px; color:var(--ink-soft); background:var(--teal-soft); border-radius:10px; padding:12px; line-height:1.5; }
+  .table-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:4px; }
+  table.data-table{ border-collapse:collapse; font-size:12.5px; }
+  table.data-table th, table.data-table td{ min-width:46px; }
+  table.data-table th:first-child, table.data-table td:first-child{ min-width:90px; }
+  table.data-table th{ text-align:left; color:var(--ink-soft); text-transform:uppercase; font-size:10.5px; letter-spacing:.04em; padding:6px 8px; border-bottom:2px solid var(--line); }
+  table.data-table td{ padding:7px 8px; border-bottom:1px solid var(--line); }
+
+  ::selection{ background:var(--teal-soft); }
+
+  /* ---------- Responsive tuning across device sizes ---------- */
+  /* Widescreen / 24" / 18" / 16" monitors: #app's 920px cap keeps the wizard at a
+     comfortable reading width instead of stretching form fields uncomfortably wide;
+     the extra space simply frames it. Tiers below handle the narrower end. */
+  @media (max-width:900px){ /* tablet landscape, small laptop windows */
+    main{ padding:20px 18px 120px 18px; }
+  }
+  @media (max-width:768px){ /* tablet portrait */
+    .topbar{ padding:16px 16px 0 16px; }
+    main{ padding:18px 16px 120px 16px; }
+    .stepper{ padding:10px 16px; }
+  }
+  @media (max-width:520px){ /* mobile phone */
+    .stat{ min-width:96px; padding:10px; }
+    .stat .n{ font-size:19px; }
+    .card{ padding:14px; }
+    .topbar-title h1{ font-size:17px; }
+    .name-btn{ padding:14px 8px; font-size:13px; }
+  }
+  @media (max-width:360px){ /* very narrow phones */
+    .keypad{ max-width:220px; }
+    .key-btn{ padding:13px 0; font-size:17px; }
+  }
+
+  /* ---------- Update banner ---------- */
+  body.has-update-banner{ padding-top:44px; }
+  .update-banner{
+    position:fixed; top:0; left:0; right:0; z-index:999;
+    background:var(--amber); color:#fff; padding:10px 16px;
+    display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap;
+    font-size:13px; font-weight:600; box-shadow:0 2px 10px rgba(0,0,0,0.15);
+  }
+  .update-banner button{ border:none; border-radius:7px; padding:6px 14px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:'Space Grotesk',sans-serif; }
+  #updateRefreshBtn{ background:#fff; color:var(--amber); }
+  #updateDismissBtn{ background:rgba(255,255,255,0.22); color:#fff; }
+
+  /* ---------- Print / PDF export ---------- */
+  #printArea{ display:none; }
+  @page{ size: A4; margin: 15mm; }
+  @media print{
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{ display:block; position:absolute; top:0; left:0; width:100%; padding:0; font-family:'Inter',sans-serif; color:#10262B; }
+    .pr-box, .pr-table{ page-break-inside:avoid; }
+    .pr-head{ text-align:center; margin-bottom:16px; }
+    .pr-org{ font-size:16px; font-weight:800; color:#2F8F5B; letter-spacing:.02em; }
+    .pr-org-sub{ font-size:10px; letter-spacing:.15em; color:#5B6E70; margin-bottom:8px; }
+    .pr-head h1{ font-size:15px; font-weight:800; border-top:2px solid #10262B; border-bottom:2px solid #10262B; padding:6px 0; margin-top:6px; }
+    .pr-box{ border:1.5px solid #10262B; margin-bottom:14px; }
+    .pr-field{ display:flex; border-bottom:1px solid #10262B; font-size:11px; }
+    .pr-field:last-child{ border-bottom:none; }
+    .pr-label{ width:34%; font-weight:700; padding:5px 8px; border-right:1px solid #10262B; }
+    .pr-value{ width:66%; padding:5px 8px; white-space:pre-wrap; }
+    .pr-table{ width:100%; border-collapse:collapse; margin-bottom:14px; font-size:10px; }
+    .pr-table th, .pr-table td{ border:1px solid #10262B; padding:4px 5px; text-align:center; }
+    .pr-table td:first-child, .pr-table th:first-child{ text-align:left; }
+    .pr-sig{ font-size:11px; margin-top:10px; }
+    .pr-foot{ margin-top:24px; font-size:9px; color:#5B6E70; display:flex; justify-content:space-between; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-row" id="topbarRow"></div>
+    <div class="heartline">
+      <svg viewBox="0 0 400 14" preserveAspectRatio="none">
+        <path d="M0,7 L60,7 L72,2 L84,12 L96,7 L160,7 L172,2 L184,12 L196,7 L260,7 L272,2 L284,12 L296,7 L400,7"/>
+      </svg>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" style="display:none;"></nav>
+  <nav class="stepper" id="stepper" style="display:none;"></nav>
+  <main id="content"><div style="text-align:center;padding:60px 20px;color:var(--ink-faint);font-size:13px;">Loading…</div></main>
+  <div class="bottombar" id="bottombar" style="display:none;">
+    <div class="bottombar-inner">
+      <button class="nav-btn prev" id="btnPrev">Back</button>
+      <span class="pos-label" id="posLabel"></span>
+      <button class="nav-btn next" id="btnNext">Next</button>
+    </div>
+  </div>
+</div>
+
+<div id="updateBanner" class="update-banner" style="display:none;">
+  <span>A newer version of this app is available.</span>
+  <button id="updateRefreshBtn">Refresh Now</button>
+  <button id="updateDismissBtn">Later</button>
+</div>
+
+<div id="printArea"></div>
+
+<script>
+(function(){
+
+  // Bump this on every deploy so open tabs (e.g. a kiosk device left open for days)
+  // can detect a newer version is live and prompt to refresh, instead of silently
+  // running stale code.
+  var APP_VERSION = '2026.08.04.08';
+  var updateState = { latestVersion:null, dismissedVersion:null };
+
+  function checkForUpdate(){
+    fetch(location.pathname + '?_=' + Date.now(), { cache:'no-store' })
+      .then(function(r){ return r.ok ? r.text() : null; })
+      .then(function(html){
+        if(!html) return;
+        var m = html.match(/APP_VERSION\s*=\s*'([^']+)'/);
+        if(m && m[1] && m[1]!==APP_VERSION && m[1]!==updateState.dismissedVersion){
+          updateState.latestVersion = m[1];
+          document.getElementById('updateBanner').style.display = 'flex';
+          document.body.classList.add('has-update-banner');
+        }
+      })
+      .catch(function(){ /* offline, or not yet on a real server — ignore silently */ });
+  }
+
+  // ================= SUPABASE =================
+  var SUPABASE_URL = 'https://ntpyetdifaxdjzoazkka.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_yRy9fxwfe4qVGYvAeFQeYw_-mNhxGys';
+  var sb = null;
+  try {
+    if(window.supabase && window.supabase.createClient){ sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); }
+  } catch(e){ console.error('Supabase client init failed', e); }
+
+  function syncUserUpsert(u){
+    if(!sb) return;
+    sb.from('users').upsert({
+      name:u.name, role:u.role, pin:u.pin, pin_changed:u.pinChanged,
+      sec_q1:u.secQ1||'', sec_a1:u.secA1||'', sec_q2:u.secQ2||'', sec_a2:u.secA2||'', from_schedule:!!u.fromSchedule
+    }, { onConflict:'name' }).then(function(r){ if(r.error) console.error('syncUserUpsert', r.error); });
+  }
+  function syncUserDelete(name){
+    if(!sb) return;
+    sb.from('users').delete().eq('name', name).then(function(r){ if(r.error) console.error('syncUserDelete', r.error); });
+  }
+  function syncScheduleReplace(rows){
+    if(!sb) return;
+    sb.from('schedule').delete().gte('id', 0).then(function(delRes){
+      if(delRes.error){ console.error('syncScheduleReplace delete', delRes.error); return; }
+      if(!rows.length) return;
+      var payload = rows.map(function(r){ return { date:r.date, room:r.room, staff:r.staff }; });
+      sb.from('schedule').insert(payload).then(function(insRes){ if(insRes.error) console.error('syncScheduleReplace insert', insRes.error); });
+    });
+  }
+  function syncLogInsert(rec){
+    if(!sb) return;
+    sb.from('submitted_logs').insert({
+      date:rec.date, room:rec.room, recorder:rec.recorder, late:!!rec.late, payload:rec.payload, submitted_at:rec.submittedAt
+    }).then(function(r){ if(r.error) console.error('syncLogInsert', r.error); });
+  }
+  function syncCorrectionsReplace(){
+    if(!sb) return;
+    sb.from('name_corrections').delete().gte('id', 0).then(function(delRes){
+      if(delRes.error){ console.error('syncCorrectionsReplace delete', delRes.error); return; }
+      if(!scheduleNameCorrections.length) return;
+      var payload = scheduleNameCorrections.map(function(c){ return { from_name:c.from, to_name:c.to }; });
+      sb.from('name_corrections').insert(payload).then(function(r){ if(r.error) console.error('syncCorrectionsReplace insert', r.error); });
+    });
+  }
+  function loadFromSupabase(){
+    if(!sb) return Promise.resolve(false);
+    return Promise.all([
+      sb.from('users').select('*'),
+      sb.from('schedule').select('*'),
+      sb.from('submitted_logs').select('*'),
+      sb.from('name_corrections').select('*')
+    ]).then(function(results){
+      var uRes=results[0], sRes=results[1], lRes=results[2], cRes=results[3];
+      if(uRes.error || sRes.error || lRes.error || cRes.error){
+        console.error('Supabase load error', uRes.error, sRes.error, lRes.error, cRes.error);
+        return false;
+      }
+      var hadUsers = !!(uRes.data && uRes.data.length>0);
+      if(hadUsers){
+        users = uRes.data.map(function(row){
+          return { name:row.name, role:row.role, pin:row.pin, pinChanged:row.pin_changed,
+            secQ1:row.sec_q1||'', secA1:row.sec_a1||'', secQ2:row.sec_q2||'', secA2:row.sec_a2||'', fromSchedule:!!row.from_schedule };
+        });
+      }
+      if(sRes.data && sRes.data.length>0){
+        schedule = sRes.data.map(function(row){ return { date:row.date, room:row.room, staff:row.staff }; });
+        lastScheduleNames = {};
+        schedule.forEach(function(s){ lastScheduleNames[s.staff.toLowerCase()] = true; });
+      }
+      if(lRes.data){
+        submittedLogs = lRes.data.map(function(row){ return { date:row.date, room:row.room, recorder:row.recorder, late:!!row.late, payload:row.payload, submittedAt:row.submitted_at }; });
+      }
+      if(cRes.data && cRes.data.length>0){
+        scheduleNameCorrections = cRes.data.map(function(row){ return { from:row.from_name, to:row.to_name }; });
+      }
+      return hadUsers;
+    }).catch(function(err){ console.error('Supabase load failed', err); return false; });
+  }
+
+  var DEFAULT_PIN = '0000';
+  var SECURITY_QUESTIONS = [
+    "Name of your first employer",
+    "City where you were born",
+    "Name of your favorite teacher",
+    "Your childhood nickname",
+    "Name of your first pet"
+  ];
+
+  // The August 2026 schedule is the source of truth for staff — everyone else is
+  // auto-registered from it when the baseline loads. Ralp (superuser) is the only
+  // fixed seed account, since he needs a permanent role and a non-default PIN.
+  var users = [
+    { name:'Ralp Paragili', role:'superuser', pin:'0315', pinChanged:false, secQ1:'', secA1:'', secQ2:'', secA2:'', fromSchedule:false }
+  ];
+  var lastScheduleNames = {}; // name.toLowerCase() -> true, from the most recent NURSES-section import
+  var scheduleNameCorrections = [ {from:'Arriane Tan', to:'Arianne Tan'} ]; // schedule spelling -> canonical name
+  function applyNameCorrection(name){
+    var hit = scheduleNameCorrections.filter(function(c){ return c.from.toLowerCase()===name.toLowerCase(); })[0];
+    return hit ? hit.to : name;
+  }
+
+  var OR_CHECK_SECTIONS = [
+    { id:'damp', title:'Surface Cleaning — Damp Dusting', note:'5L of water to 4 tablets Presept.',
+      items:['OR Light','OR Table','Back Table','Mayo Tray'] },
+    { id:'electronics', title:'Surface Cleaning for Electronics', note:'Alcohol-free disinfectant wipes designed for medical devices only.',
+      items:['Anesthesia Machine','Cardiac Patient Monitor','Cardiac Patient Monitor Cables','Patient Warmer','Cautery Machine','Tourniquet Machine','Suction Machine'] },
+    { id:'anesthesia', title:'Prepare Anesthesia Machine & Supplies',
+      items:['Orientation to Surgical Site','Turn On Anesthesia Machine','Machine Self Check or Manual Check','Breathing Circuits (new per day)','Place Water Filter','HME Filters (new per day)','Sampling Line','Sevoflurane Level Check, Refill if Needed'] },
+    { id:'airway', title:'Airway Devices & Adjuncts',
+      items:['Laryngoscope Battery Check','Completeness of Laryngoscope Blades','Appropriate Suction Catheter Size','Oral Airway (OPA)','Nasal Airway (NPA)'] },
+    { id:'cardiac', title:'Patient Cardiac Monitor Check',
+      items:['Turn On ESU','Patient Cardiac Monitor','ECG Transducer Cable & Electrodes Check','BP Cuff Pressure Check','SpO2 Sensor Check'] },
+    { id:'esu', title:'Electrosurgical Unit (ESU) Check', items:['Turn On ESU','Check for Error Prompt','Grounding Pad'] },
+    { id:'suction', title:'Suction Machine Check', items:['Turn On Suction Machine','Suction Bottle','Suction Tube & Extension (if needed)'] },
+    { id:'warmer', title:'Patient Warmer Check', items:['Turn On Patient Warmer','Check for Error Prompt'] },
+    { id:'tourniquet', title:'Tourniquet Machine Check', items:['Turn On Tourniquet Machine','Check for Error Prompt','Attach Cuff, Check for Leaks'] },
+    { id:'ortable', title:'Prepare OR Table', items:['Orientation to Surgical Site','Bedsheet in Place','Blanket(s) Ready','Pillow / Donut','Shoulder Roll','Stand by Restraining Straps'] }
+  ];
+  var PACU_CHECK_SECTIONS = [
+    { id:'pacu_laptop', title:'Prepare Laptop', items:['Turn On Laptop','Check Battery, Charge if Low','Login Google Workspace'] },
+    { id:'pacu_disinfect', title:'Disinfect Electronic Devices', note:'Use disinfectant wipes made for medical devices and electronics.',
+      items:['Your Mobile Smart Phone','Designated PACU Laptop(s)','Cardiac Patient Monitor Cables','Cardiac Monitor(s)','Mobile Fingertip Pulse Oximeters','Suction Machine','Patient Warmer'] },
+    { id:'pacu_damp', title:'Surface Cleaning — Damp Dusting', note:'5L of water to 4 tablets Presept.',
+      items:['Stretcher','Bedside Table','Station Table','Cabinets'] },
+    { id:'pacu_cardiac', title:'Patient Cardiac Monitor Check',
+      items:['Turn On Patient Cardiac Monitor','ECG Transducer Cable & Electrodes Check','BP Cuff Pressure Check','SpO2 Sensor Check'] },
+    { id:'pacu_stretcher', title:'Prepare Stretcher', items:['Test Side Rails','Bed Covers','Pillow Covers','Blankets'] },
+    { id:'pacu_suction', title:'Suction Machine Check', items:['Turn On Suction Machine','Suction Bottle','Suction Tube & Extension (if needed)'] },
+    { id:'pacu_airway', title:'Airway Devices & Adjuncts', items:['Laryngoscope Battery Check','Completeness of Laryngoscope Blades','Appropriate Suction Catheter Size','Oral Airway (OPA)','Nasal Airway (NPA)'] },
+    { id:'pacu_supplies', title:'Gather Supplies', items:['Stethoscope for Each Bedside Table','Flashlight/Penlight for Each Bedside Table','Nasal Cannulas (Various Sizes)','Face Masks (Various Sizes)','Emesis Basins/Bags','Scissors, Tape, Coban, Bandages'] },
+    { id:'pacu_warmer', title:'Patient Warmer Check', items:['Turn On Patient Warmer','Check for Error Prompt'] }
+  ];
+  var STATUS_OPTS = [ {v:'done', label:'Done', cls:'sel-done'}, {v:'na', label:'N/A', cls:'sel-na'}, {v:'biomed', label:'BioMed', cls:'sel-biomed'} ];
+
+  function checklistTypeForRoom(room){ return room==='PACU' ? 'PACU' : 'OR'; }
+  function sectionsFor(type){ return type==='PACU' ? PACU_CHECK_SECTIONS : OR_CHECK_SECTIONS; }
+  function currentType(){ return checklistTypeForRoom(state.room); }
+  function currentSections(){ return sectionsFor(currentType()); }
+  function currentPages(){
+    var t = currentType();
+    var pages = ['header'].concat(sectionsFor(t).map(function(s){return s.id;})).concat(['climate','gases']);
+    if(t==='PACU') pages.push('formsprep');
+    pages.push('review');
+    return pages;
+  }
+  function currentPageTitles(){
+    var titles = {header:'Recorder & Room', climate:'Temperature & Humidity', gases:'Medical Gases', review:'Review & Submit', formsprep:'Patient Forms Preparation'};
+    currentSections().forEach(function(s){ titles[s.id] = s.title; });
+    return titles;
+  }
+
+  function freshEntryState(room){
+    var type = checklistTypeForRoom(room);
+    var sections = sectionsFor(type);
+    return { recorder:(session && session.user ? session.user.name : ''), date:new Date().toISOString().slice(0,10), room:room||'', checks:(function(){
+        var c={}; sections.forEach(function(s){ c[s.id]={}; }); return c; })(),
+      temp:'', temp_na:false, humidity:'', humidity_na:false, abnormal:'', actions:{},
+      gases:{ o2_1:{psi:'', na:false, time:'', remarks:''}, o2_2:{psi:'', na:false, time:'', remarks:''}, air:{psi:'', na:false, time:'', remarks:''} },
+      gasesPacu:{ bed_1:{psi:'', na:false, humidifier:'', time:'', remarks:''}, bed_2:{psi:'', na:false, humidifier:'', time:'', remarks:''}, bed_3:{psi:'', na:false, humidifier:'', time:'', remarks:''} },
+      formsPrep:{ caseCount:'', clipboards:'', formsFilled:'' },
+      retrospective:false, late:false, lateReason:null, lateAcknowledged:false,
+      submitted:false, showJson:false };
+  }
+  var schedule = []; // {date, room, staff}
+  var submittedLogs = []; // {date, room, recorder, payload, submittedAt}
+  var session = { user:null, roomQueue:[] };
+  var state = freshEntryState();
+  var current = 0;
+
+  var appState = { view:'login' }; // login | entry | dashboard | admin
+
+  var loginFlow = { step:'name', selectedUser:null, pinDigits:'', newPin1:'', newPin2:'',
+    q1:'', a1:'', q2:'', a2:'', fa1:'', fa2:'', error:'', showAllNames:false, selectedRooms:[], roomError:'' };
+  function resetLoginFlow(){ loginFlow = { step:'name', selectedUser:null, pinDigits:'', newPin1:'', newPin2:'', q1:'', a1:'', q2:'', a2:'', fa1:'', fa2:'', error:'', showAllNames:false, selectedRooms:[], roomError:'' }; }
+
+  function el(tag, attrs, children){
+    var e = document.createElement(tag);
+    if(attrs) Object.keys(attrs).forEach(function(k){
+      if(k==='class') e.className = attrs[k];
+      else if(k==='html') e.innerHTML = attrs[k];
+      else if(k==='style') e.setAttribute('style', attrs[k]);
+      else e.setAttribute(k, attrs[k]);
+    });
+    (children||[]).forEach(function(c){ if(c) e.appendChild(c); });
+    return e;
+  }
+  function text(t){ return document.createTextNode(t); }
+
+  // ================= AUTH =================
+  var ROOM_OPTIONS = ['OR1','OR2','OR3','PACU'];
+
+  function todayScheduledRoomsFor(name){
+    var today = new Date().toISOString().slice(0,10);
+    var rooms = schedule.filter(function(s){ return s.date===today && s.staff.toLowerCase()===name.toLowerCase(); }).map(function(s){ return s.room; });
+    return Array.from(new Set(rooms));
+  }
+  function selectUserForLogin(name){
+    loginFlow.selectedUser = users.filter(function(u){return u.name===name;})[0];
+    loginFlow.step = 'pin'; loginFlow.pinDigits=''; loginFlow.error='';
+    loginFlow.selectedRooms = todayScheduledRoomsFor(name);
+    loginFlow.roomError = '';
+    renderApp();
+  }
+  function toggleLoginRoom(room){
+    var i = loginFlow.selectedRooms.indexOf(room);
+    if(i>-1) loginFlow.selectedRooms.splice(i,1); else loginFlow.selectedRooms.push(room);
+    loginFlow.roomError = '';
+    renderApp();
+  }
+  function pinDigitPress(d){
+    if(loginFlow.pinDigits.length<4){
+      loginFlow.pinDigits += d;
+      if(loginFlow.pinDigits.length===4){ validatePin(); return; }
+    }
+    renderApp();
+  }
+  function pinBackspace(){ loginFlow.pinDigits = loginFlow.pinDigits.slice(0,-1); renderApp(); }
+
+  function validatePin(){
+    if(!loginFlow.selectedRooms || loginFlow.selectedRooms.length===0){
+      loginFlow.roomError = 'Select at least one room/area before entering your PIN.';
+      loginFlow.pinDigits = '';
+      renderApp(); return;
+    }
+    var u = loginFlow.selectedUser;
+    if(loginFlow.pinDigits === u.pin){
+      loginFlow.error='';
+      if(!u.pinChanged){ loginFlow.step='offer-setpin'; }
+      else { loginSuccess(u); return; }
+    } else {
+      loginFlow.error = 'Incorrect PIN. Try again.'; loginFlow.pinDigits='';
+    }
+    renderApp();
+  }
+  function evaluateLateness(){
+    if(state.retrospective){ state.late = true; state.lateReason = 'retrospective'; state.lateAcknowledged = false; return; }
+    var now = new Date();
+    var hour = now.getHours() + now.getMinutes()/60;
+    if(hour < 5 || hour >= 12){ state.late = true; state.lateReason = 'outside-window'; state.lateAcknowledged = false; }
+    else { state.late = false; state.lateReason = null; state.lateAcknowledged = false; }
+  }
+  function hasQueuedRooms(){ return session.roomQueue && session.roomQueue.length>0; }
+  function beginFreshEntry(){
+    var nextRoom = hasQueuedRooms() ? session.roomQueue.shift() : undefined;
+    state = freshEntryState(nextRoom);
+    evaluateLateness();
+    current = 0;
+  }
+  function startAdHocEntry(room){
+    state = freshEntryState(room);
+    evaluateLateness();
+    current = 0;
+    renderApp();
+  }
+  function myMissedLogs(){
+    if(!session.user) return [];
+    return computeMissedLogs().filter(function(m){ return m.staff.toLowerCase()===session.user.name.toLowerCase(); });
+  }
+  function switchToMissedDate(dateStr, room){
+    state.retrospective = true; state.date = dateStr; state.room = room || state.room;
+    evaluateLateness();
+    renderApp();
+  }
+  function switchToTodayEntry(){
+    var recorder = state.recorder;
+    state = freshEntryState(hasQueuedRooms() ? session.roomQueue[0] : undefined); state.recorder = recorder;
+    evaluateLateness();
+    renderApp();
+  }
+
+  function loginSuccess(u){
+    session.user = u; session.roomQueue = loginFlow.selectedRooms.slice(); appState.view='entry'; beginFreshEntry(); resetLoginFlow();
+    renderApp();
+  }
+  function logout(){ session.user=null; session.roomQueue=[]; appState.view='login'; state = freshEntryState(); current=0; resetLoginFlow(); renderApp(); }
+
+  function skipSetPin(){ loginSuccess(loginFlow.selectedUser); }
+  function beginSetPin(){ loginFlow.step='setpin1'; loginFlow.pinDigits=''; loginFlow.error=''; renderApp(); }
+
+  function setpinDigitPress(d){
+    if(loginFlow.step==='setpin1'){
+      if(loginFlow.pinDigits.length<4){ loginFlow.pinDigits+=d; }
+      if(loginFlow.pinDigits.length===4){ loginFlow.newPin1=loginFlow.pinDigits; loginFlow.pinDigits=''; loginFlow.step='setpin2'; }
+    } else if(loginFlow.step==='setpin2'){
+      if(loginFlow.pinDigits.length<4){ loginFlow.pinDigits+=d; }
+      if(loginFlow.pinDigits.length===4){
+        if(loginFlow.pinDigits===loginFlow.newPin1){
+          loginFlow.newPin2=loginFlow.pinDigits; loginFlow.pinDigits=''; loginFlow.error='';
+          loginFlow.step='setquestions';
+        } else {
+          loginFlow.error='PINs do not match. Start over.'; loginFlow.pinDigits=''; loginFlow.newPin1=''; loginFlow.step='setpin1';
+        }
+      }
+    } else if(loginFlow.step==='forgot-setpin1'){
+      if(loginFlow.pinDigits.length<4){ loginFlow.pinDigits+=d; }
+      if(loginFlow.pinDigits.length===4){ loginFlow.newPin1=loginFlow.pinDigits; loginFlow.pinDigits=''; loginFlow.step='forgot-setpin2'; }
+    } else if(loginFlow.step==='forgot-setpin2'){
+      if(loginFlow.pinDigits.length<4){ loginFlow.pinDigits+=d; }
+      if(loginFlow.pinDigits.length===4){
+        if(loginFlow.pinDigits===loginFlow.newPin1){
+          var u = loginFlow.selectedUser; u.pin = loginFlow.pinDigits; syncUserUpsert(u); loginSuccess(u); return;
+        } else {
+          loginFlow.error='PINs do not match. Start over.'; loginFlow.pinDigits=''; loginFlow.newPin1=''; loginFlow.step='forgot-setpin1';
+        }
+      }
+    }
+    renderApp();
+  }
+  function setpinBackspace(){ loginFlow.pinDigits = loginFlow.pinDigits.slice(0,-1); renderApp(); }
+
+  function saveSecurityQuestions(){
+    if(!loginFlow.q1 || !loginFlow.a1.trim() || !loginFlow.q2 || !loginFlow.a2.trim()){
+      loginFlow.error = 'Answer both security questions to continue.'; renderApp(); return;
+    }
+    if(loginFlow.q1===loginFlow.q2){
+      loginFlow.error = 'Choose two different questions.'; renderApp(); return;
+    }
+    var u = loginFlow.selectedUser;
+    u.pin = loginFlow.newPin2; u.pinChanged = true;
+    u.secQ1 = loginFlow.q1; u.secA1 = loginFlow.a1.trim().toLowerCase();
+    u.secQ2 = loginFlow.q2; u.secA2 = loginFlow.a2.trim().toLowerCase();
+    syncUserUpsert(u);
+    loginSuccess(u);
+  }
+
+  function beginForgotFlow(){ loginFlow.step='forgot-questions'; loginFlow.fa1=''; loginFlow.fa2=''; loginFlow.error=''; renderApp(); }
+  function submitForgotAnswers(){
+    var u = loginFlow.selectedUser;
+    if(loginFlow.fa1.trim().toLowerCase()===u.secA1 && loginFlow.fa2.trim().toLowerCase()===u.secA2){
+      loginFlow.step='forgot-setpin1'; loginFlow.pinDigits=''; loginFlow.error='';
+    } else {
+      loginFlow.error='Answers did not match our records.';
+    }
+    renderApp();
+  }
+
+  // Superuser: reset a user's pin to default (e.g. locked out)
+  function adminResetPin(name){
+    var u = users.filter(function(x){return x.name===name;})[0];
+    if(!u) return;
+    u.pin = DEFAULT_PIN; u.pinChanged=false; u.secQ1=''; u.secA1=''; u.secQ2=''; u.secA2='';
+    syncUserUpsert(u);
+    renderApp();
+  }
+  function adminSetRole(name, role){
+    var u = users.filter(function(x){return x.name===name;})[0];
+    if(u){ u.role = role; syncUserUpsert(u); }
+    renderApp();
+  }
+  function adminAddUser(name, role){
+    if(!name || !name.trim()) return;
+    if(users.some(function(u){return u.name.toLowerCase()===name.trim().toLowerCase();})) return;
+    var newUser = { name:name.trim(), role:role, pin:DEFAULT_PIN, pinChanged:false, secQ1:'', secA1:'', secQ2:'', secA2:'', fromSchedule:false };
+    users.push(newUser);
+    syncUserUpsert(newUser);
+    renderApp();
+  }
+  function adminDeleteUser(name){
+    if(session.user && session.user.name===name){ return; } // can't delete yourself
+    if(!window.confirm('Delete '+name+'? This cannot be undone.')) return;
+    users = users.filter(function(u){ return u.name!==name; });
+    syncUserDelete(name);
+    renderApp();
+  }
+
+  // ================= SCHEDULE / MISSED LOGS =================
+  var lastScheduleImport = null; // {addedCount, totalRows, format}
+
+  // Robust CSV parser (handles quoted fields with embedded commas/newlines, CRLF)
+  function parseCSV(text){
+    var rows = []; var row = []; var field = ''; var inQuotes = false;
+    for(var i=0;i<text.length;i++){
+      var c = text[i];
+      if(inQuotes){
+        if(c === '"'){ if(text[i+1] === '"'){ field += '"'; i++; } else { inQuotes = false; } }
+        else { field += c; }
+      } else {
+        if(c === '"'){ inQuotes = true; }
+        else if(c === ','){ row.push(field); field=''; }
+        else if(c === '\r'){ /* skip */ }
+        else if(c === '\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+        else { field += c; }
+      }
+    }
+    if(field.length>0 || row.length>0){ row.push(field); rows.push(row); }
+    return rows;
+  }
+  function titleCaseName(s){
+    return s.toLowerCase().replace(/\s+/g,' ').trim().split(' ').map(function(w){
+      return w.length ? w.charAt(0).toUpperCase()+w.slice(1) : w;
+    }).join(' ');
+  }
+  function normalizeScheduleName(raw){
+    var parts = String(raw).split(',');
+    if(parts.length<2) return titleCaseName(raw.replace(/\s+/g,' ').trim());
+    var last = parts[0].trim();
+    var first = parts.slice(1).join(',').trim();
+    return titleCaseName(first) + ' ' + titleCaseName(last);
+  }
+  var MONTH_NAMES = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+
+  function processScheduleCSVText(text){
+      var rows = parseCSV(text);
+      if(rows.length<2){ lastScheduleImport={error:'File appears empty.'}; renderApp(); return; }
+
+      // Legacy simple format: header row literally contains date, room, staff
+      var firstHeader = (rows[0]||[]).map(function(h){return String(h).trim().toLowerCase();});
+      if(firstHeader.indexOf('date')>-1 && firstHeader.indexOf('room')>-1 && firstHeader.indexOf('staff')>-1){
+        var dIdx=firstHeader.indexOf('date'), rIdx=firstHeader.indexOf('room'), sIdx=firstHeader.indexOf('staff');
+        var simpleRows = [];
+        for(var i=1;i<rows.length;i++){
+          var r = rows[i];
+          if(r[dIdx]) simpleRows.push({ date:String(r[dIdx]).trim(), room:String(r[rIdx]).trim(), staff:String(r[sIdx]).trim() });
+        }
+        schedule = simpleRows;
+        syncScheduleReplace(schedule);
+        lastScheduleImport = { format:'simple', totalRows:simpleRows.length, addedCount:0 };
+        renderApp(); return;
+      }
+
+      // TCCH Duty Schedule pivot format
+      var year=null, month=null;
+      for(var m=0; m<Math.min(rows.length,8); m++){
+        for(var c=0;c<rows[m].length;c++){
+          var cell = String(rows[m][c]||'').trim();
+          var match = cell.match(/^([A-Za-z]+)\s+(\d{4})$/);
+          if(match && MONTH_NAMES.indexOf(match[1].toLowerCase())>-1){
+            month = MONTH_NAMES.indexOf(match[1].toLowerCase())+1; year = parseInt(match[2],10);
+          }
+        }
+      }
+      var nameRowIdx = -1;
+      for(var n=0;n<rows.length;n++){
+        if(String(rows[n][0]||'').trim().toUpperCase()==='NAME'){ nameRowIdx = n; break; }
+      }
+      if(!year || !month || nameRowIdx<0){
+        lastScheduleImport = { error:'Could not detect the month/year or the NAME header row in this file.' };
+        renderApp(); return;
+      }
+      var dayRow = rows[nameRowIdx+1];
+      var newSchedule = [];
+      var section = null;
+      var namesSeen = {};
+      for(var ri=nameRowIdx+2; ri<rows.length; ri++){
+        var rowArr = rows[ri];
+        var firstCell = String(rowArr[0]||'').trim();
+        var upper = firstCell.toUpperCase();
+        if(upper==='NURSES'){ section='NURSES'; continue; }
+        if(upper==='CSSD' || upper==='SUPPLIES' || upper==='LEGEND'){ break; } // stop — only NURSES drives OR/PACU opener assignment
+        if(!firstCell) continue;
+        if(section!=='NURSES') continue;
+        var staffName = applyNameCorrection(normalizeScheduleName(firstCell));
+        namesSeen[staffName] = true;
+        for(var di=1; di<dayRow.length; di++){
+          var dayNum = parseInt(String(dayRow[di]||'').trim(),10);
+          if(isNaN(dayNum)) continue;
+          var cellText = String(rowArr[di]||'');
+          var iso = year+'-'+String(month).padStart(2,'0')+'-'+String(dayNum).padStart(2,'0');
+          var roomMatch = cellText.match(/OR\s*([123])/i);
+          // Only the 7am shift is the OR "Opener" for that room/day — "7:30" and other
+          // shift times aren't opener duty even if they also mention an OR room.
+          var isOROpenerShift = /^\s*7(?!:30)/.test(cellText);
+          if(roomMatch && isOROpenerShift){
+            newSchedule.push({ date:iso, room:'OR'+roomMatch[1], staff:staffName });
+          }
+          // PACU opener is the 8am shift specifically mentioning PACU (9am PACU is a
+          // different, non-opener shift).
+          var isPACUOpenerShift = /^\s*8(?!:)/.test(cellText) && /PACU/i.test(cellText);
+          if(isPACUOpenerShift){
+            newSchedule.push({ date:iso, room:'PACU', staff:staffName });
+          }
+        }
+      }
+      schedule = newSchedule;
+      syncScheduleReplace(schedule);
+      lastScheduleNames = {};
+      Object.keys(namesSeen).forEach(function(nm){ lastScheduleNames[nm.toLowerCase()] = true; });
+
+      // Auto-register any schedule staff not already known
+      var added = 0;
+      Object.keys(namesSeen).forEach(function(nm){
+        var exists = users.some(function(u){ return u.name.toLowerCase()===nm.toLowerCase(); });
+        if(!exists){
+          var newUser = { name:nm, role:'user', pin:DEFAULT_PIN, pinChanged:false, secQ1:'', secA1:'', secQ2:'', secA2:'', fromSchedule:true };
+          users.push(newUser); syncUserUpsert(newUser); added++;
+        }
+      });
+
+      // Auto-remove staff who are no longer on the schedule — only accounts that were
+      // themselves auto-added from a prior schedule import, never customized their PIN,
+      // and aren't the account currently logged in. Anyone who has personalized their PIN
+      // is kept and flagged for manual review instead, since they've actually used the app.
+      var removed = 0, flagged = 0;
+      users = users.filter(function(u){
+        if(!u.fromSchedule || u.role!=='user') return true;
+        if(session.user && session.user.name===u.name) return true;
+        if(lastScheduleNames[u.name.toLowerCase()]) return true;
+        if(u.pinChanged){ flagged++; return true; }
+        syncUserDelete(u.name);
+        removed++; return false;
+      });
+
+      lastScheduleImport = { format:'pivot', totalRows:newSchedule.length, addedCount:added, removedCount:removed, flaggedCount:flagged, monthLabel: MONTH_NAMES[month-1] };
+      renderApp();
+  }
+
+  function handleScheduleCSV(file){
+    var reader = new FileReader();
+    reader.onload = function(e){ processScheduleCSVText(String(e.target.result)); };
+    reader.readAsText(file);
+  }
+
+  function computeMissedLogs(){
+    var today = new Date().toISOString().slice(0,10);
+    var missed = [];
+    schedule.forEach(function(s){
+      if(s.date && s.date<=today){
+        var found = submittedLogs.some(function(l){ return l.date===s.date && l.room===s.room; });
+        if(!found) missed.push(s);
+      }
+    });
+    missed.sort(function(a,b){ return a.date<b.date?1:-1; });
+    return missed;
+  }
+
+  // ================= ENTRY WIZARD LOGIC =================
+  function sectionComplete(pageId){
+    if(pageId==='header') return !!(state.recorder && state.date && state.room);
+    if(pageId==='climate'){
+      var tOk = state.temp!=='' || state.temp_na;
+      var hOk = state.humidity!=='' || state.humidity_na;
+      return tOk && hOk && state.abnormal!=='';
+    }
+    if(pageId==='gases'){
+      if(currentType()==='PACU'){
+        var gp = state.gasesPacu;
+        return ['bed_1','bed_2','bed_3'].every(function(k){ return (gp[k].psi!=='' || gp[k].na) && gp[k].humidifier!==''; });
+      }
+      var g = state.gases;
+      return (g.o2_1.psi!=='' || g.o2_1.na) && (g.o2_2.psi!=='' || g.o2_2.na) && (g.air.psi!=='' || g.air.na);
+    }
+    if(pageId==='formsprep'){
+      var fp = state.formsPrep;
+      return fp.caseCount!=='' && fp.clipboards!=='' && fp.formsFilled!=='';
+    }
+    if(pageId==='review') return false;
+    var sec = currentSections().filter(function(s){return s.id===pageId;})[0];
+    if(!sec) return false;
+    for(var i=0;i<sec.items.length;i++){ if(!state.checks[sec.id][i]) return false; }
+    return true;
+  }
+  function overallPct(){
+    var pages = currentPages();
+    var total = pages.length - 1, done=0;
+    pages.forEach(function(p){ if(p!=='review' && sectionComplete(p)) done++; });
+    return Math.round((done/total)*100);
+  }
+
+  function renderStatusItem(sectionId, item, idx){
+    var row = el('div',{class:'check-item'});
+    row.appendChild(el('div',{class:'label'},[text(item)]));
+    var grp = el('div',{class:'status-group'});
+    STATUS_OPTS.forEach(function(opt){
+      var btn = el('button',{class:'status-btn'+(state.checks[sectionId][idx]===opt.v? ' '+opt.cls:'')},[text(opt.label)]);
+      btn.addEventListener('click', function(){
+        state.checks[sectionId][idx] = (state.checks[sectionId][idx]===opt.v) ? undefined : opt.v;
+        renderApp();
+      });
+      grp.appendChild(btn);
+    });
+    row.appendChild(grp);
+    return row;
+  }
+  function renderHeaderPage(container){
+    var typeLabel = currentType()==='PACU' ? 'PACU' : 'OR Room';
+    container.appendChild(el('div',{class:'section-head'},[el('h2',{},[text('Confirm Details')])]));
+    container.appendChild(el('div',{class:'section-sub'},[text('Your name, date, and area were already set at login.')]));
+
+    var card = el('div',{class:'card'});
+    var infoGrid = el('div',{class:'grid-2'});
+    var recBlock = el('div',{class:'field-row'});
+    recBlock.appendChild(el('label',{},[text('Recorder')]));
+    recBlock.appendChild(el('div',{style:'font-size:15px;font-weight:700;padding:8px 0;'},[text(state.recorder||'—')]));
+    infoGrid.appendChild(recBlock);
+    var dateBlock = el('div',{class:'field-row'});
+    dateBlock.appendChild(el('label',{},[text(state.retrospective ? 'Date (Retrospective)' : 'Date (Auto-Detected)')]));
+    dateBlock.appendChild(el('div',{style:'font-size:15px;font-weight:700;padding:8px 0;'+(state.retrospective?'color:var(--amber);':'')},[text(state.date)]));
+    infoGrid.appendChild(dateBlock);
+    var roomBlock = el('div',{class:'field-row'});
+    roomBlock.appendChild(el('label',{},[text(typeLabel)]));
+    roomBlock.appendChild(el('div',{style:'font-size:15px;font-weight:700;padding:8px 0;'},[text(state.room||'—')]));
+    infoGrid.appendChild(roomBlock);
+    card.appendChild(infoGrid);
+    container.appendChild(card);
+
+    if(state.retrospective){
+      var backLink = el('div',{class:'forgot-link'},[text('← Back to today\'s entry')]);
+      backLink.addEventListener('click', switchToTodayEntry);
+      container.appendChild(backLink);
+    } else {
+      var missed = myMissedLogs();
+      if(missed.length>0){
+        var mcard = el('div',{class:'card', style:'border-color:var(--amber);background:var(--amber-soft);margin-top:14px;'});
+        mcard.appendChild(el('h3',{style:'font-size:13.5px;color:var(--amber);margin-bottom:8px;'},[text('You have '+missed.length+' missed log(s)')]));
+        missed.slice(0,6).forEach(function(m){
+          var row = el('div',{class:'missed-row'});
+          row.appendChild(el('span',{class:'d'},[text(m.date+' · '+m.room)]));
+          var fillBtn = el('button',{class:'mini-btn'},[text('Fill In')]);
+          fillBtn.addEventListener('click', function(){ switchToMissedDate(m.date, m.room); });
+          row.appendChild(fillBtn);
+          mcard.appendChild(row);
+        });
+        container.appendChild(mcard);
+      }
+    }
+  }
+  function renderCheckPage(container, sec){
+    container.appendChild(el('div',{class:'section-head'},[el('h2',{},[text(sec.title)])]));
+    if(sec.note) container.appendChild(el('div',{class:'section-note'},[text(sec.note)]));
+    var card = el('div',{class:'card', style:'margin-top:14px;'});
+    sec.items.forEach(function(item, idx){ card.appendChild(renderStatusItem(sec.id, item, idx)); });
+    container.appendChild(card);
+  }
+  function fieldWithNA(labelText, value, onChange, naFlag, onToggleNA, inputType, step){
+    var row = el('div',{class:'field-row'});
+    var lr = el('div',{class:'field-label-row'});
+    lr.appendChild(el('label',{},[text(labelText)]));
+    var naBtn = el('button',{class:'chip chip-sm'+(naFlag?' sel':'')},[text('N/A')]);
+    naBtn.addEventListener('click', onToggleNA);
+    lr.appendChild(naBtn); row.appendChild(lr);
+    var attrs = {type:inputType||'number'}; if(step) attrs.step=step;
+    var inp = el('input', attrs);
+    inp.value = value; inp.disabled = naFlag;
+    inp.addEventListener('input', function(e){ onChange(e.target.value); });
+    row.appendChild(inp);
+    return row;
+  }
+  function renderClimatePage(container){
+    container.appendChild(el('div',{class:'section-head'},[el('h2',{},[text('Temperature & Humidity Monitoring')])]));
+    container.appendChild(el('div',{class:'section-note'},[text('Normal range: +20°C to +24°C, humidity 20%–60%. Take immediate action if outside range.')]));
+    var card = el('div',{class:'card', style:'margin-top:14px;'});
+    var grid = el('div',{class:'grid-2'});
+    grid.appendChild(fieldWithNA('Observed Temperature (°C)', state.temp, function(v){state.temp=v;}, state.temp_na, function(){state.temp_na=!state.temp_na; renderApp();}, 'number', '0.1'));
+    grid.appendChild(fieldWithNA('Observed Humidity (%)', state.humidity, function(v){state.humidity=v;}, state.humidity_na, function(){state.humidity_na=!state.humidity_na; renderApp();}, 'number', '1'));
+    card.appendChild(grid);
+    var ynRow = el('div',{class:'field-row', style:'margin-top:4px;'});
+    ynRow.appendChild(el('label',{},[text('Is There an Abnormal Reading?')]));
+    var ynGrp = el('div',{class:'yn-group'});
+    ['Yes','No'].forEach(function(v){
+      var btn = el('button',{class:'yn-btn'+(state.abnormal===v?(v==='Yes'?' sel-yes':' sel-no'):'')},[text(v)]);
+      btn.addEventListener('click', function(){ state.abnormal=(state.abnormal===v)?'':v; renderApp(); });
+      ynGrp.appendChild(btn);
+    });
+    ynRow.appendChild(ynGrp); card.appendChild(ynRow);
+    if(state.abnormal==='Yes'){
+      var actRow = el('div',{class:'field-row', style:'margin-top:4px;'});
+      actRow.appendChild(el('label',{},[text('Immediate Action (select all that apply)')]));
+      var chips = el('div',{class:'chip-group'});
+      ['Informed Department Head','Informed Biomedical Personnel, Facilities Personnel','No Action Needed'].forEach(function(a){
+        var chip = el('button',{class:'chip'+(state.actions[a]?' sel':'')},[text(a)]);
+        chip.addEventListener('click', function(){ state.actions[a]=!state.actions[a]; renderApp(); });
+        chips.appendChild(chip);
+      });
+      actRow.appendChild(chips); card.appendChild(actRow);
+    }
+    container.appendChild(card);
+  }
+  function renderGasBlock(container, g, label, opts){
+    opts = opts || {};
+    var block = el('div',{class:'gas-block'});
+    block.appendChild(el('h3',{},[text(label)]));
+    var grid = el('div',{class:'grid-2'});
+    grid.appendChild(fieldWithNA('Start-of-Day Pressure (PSI)', g.psi, function(v){g.psi=v;}, g.na, function(){g.na=!g.na; renderApp();}, 'number'));
+    var timeRow = el('div',{class:'field-row'});
+    timeRow.appendChild(el('label',{},[text('Time Replaced (24h)')]));
+    var timeInp = el('input',{type:'time'}); timeInp.value=g.time; timeInp.disabled=g.na;
+    timeInp.addEventListener('change', function(e){ g.time=e.target.value; });
+    timeRow.appendChild(timeInp); grid.appendChild(timeRow);
+    block.appendChild(grid);
+    if(opts.humidifier){
+      var humRow = el('div',{class:'field-row', style:'margin-top:4px;'});
+      humRow.appendChild(el('label',{},[text('Oxygen Humidifier Replaced Today?')]));
+      var humGrp = el('div',{class:'yn-group'});
+      ['Yes','No'].forEach(function(v){
+        var btn = el('button',{class:'yn-btn'+(g.humidifier===v?(v==='Yes'?' sel-yes':' sel-no'):'')},[text(v)]);
+        btn.addEventListener('click', function(){ g.humidifier=(g.humidifier===v)?'':v; renderApp(); });
+        humGrp.appendChild(btn);
+      });
+      humRow.appendChild(humGrp); block.appendChild(humRow);
+    }
+    var remRow = el('div',{class:'field-row', style:'margin-top:10px;'});
+    remRow.appendChild(el('label',{},[text('Remarks')]));
+    var remInp = el('textarea',{rows:'2'}); remInp.value=g.remarks; remInp.disabled=g.na;
+    remInp.addEventListener('input', function(e){ g.remarks=e.target.value; });
+    remRow.appendChild(remInp); block.appendChild(remRow);
+    container.appendChild(block);
+  }
+  function renderGasesPage(container){
+    container.appendChild(el('div',{class:'section-head'},[el('h2',{},[text('Medical Gases Monitoring')])]));
+    var card = el('div',{class:'card'});
+    if(currentType()==='PACU'){
+      container.appendChild(el('div',{class:'section-sub'},[text('Oxygen cylinder status per bed at start of day. The humidifier is only viable 24 hours — replace daily.')]));
+      renderGasBlock(card, state.gasesPacu.bed_1, 'O₂ Cylinder — Bed #1', {humidifier:true});
+      renderGasBlock(card, state.gasesPacu.bed_2, 'O₂ Cylinder — Bed #2', {humidifier:true});
+      renderGasBlock(card, state.gasesPacu.bed_3, 'O₂ Cylinder — Bed #3', {humidifier:true});
+    } else {
+      container.appendChild(el('div',{class:'section-sub'},[text('Oxygen and compressed air cylinder status at start of day. Mark N/A if a slot is not in use.')]));
+      renderGasBlock(card, state.gases.o2_1, 'O₂ Cylinder — Slot #1');
+      renderGasBlock(card, state.gases.o2_2, 'O₂ Cylinder — Slot #2');
+      renderGasBlock(card, state.gases.air, 'Compressed Air Cylinder');
+    }
+    container.appendChild(card);
+  }
+  function renderFormsPrepPage(container){
+    container.appendChild(el('div',{class:'section-head'},[el('h2',{},[text('Patient Forms Preparation')])]));
+    container.appendChild(el('div',{class:'section-sub'},[text('Consent forms, checklists, and patient records bundled ahead of the day\'s cases.')]));
+    var card = el('div',{class:'card'});
+    var caseRow = el('div',{class:'field-row'});
+    caseRow.appendChild(el('label',{},[text('Number of Surgical Cases')]));
+    var caseInp = el('input',{type:'number', min:'0'}); caseInp.value = state.formsPrep.caseCount;
+    caseInp.addEventListener('input', function(e){ state.formsPrep.caseCount=e.target.value; renderApp(); });
+    caseRow.appendChild(caseInp); card.appendChild(caseRow);
+
+    [['clipboards','Gather All Clipboards'],['formsFilled','Gather All Forms & Fill In Each Clipboard']].forEach(function(f){
+      var row = el('div',{class:'field-row'});
+      row.appendChild(el('label',{},[text(f[1])]));
+      var grp = el('div',{class:'yn-group'});
+      ['Done','Not Done'].forEach(function(v){
+        var btn = el('button',{class:'yn-btn'+(state.formsPrep[f[0]]===v?(v==='Done'?' sel-no':' sel-yes'):'')},[text(v)]);
+        btn.addEventListener('click', function(){ state.formsPrep[f[0]]=(state.formsPrep[f[0]]===v)?'':v; renderApp(); });
+        grp.appendChild(btn);
+      });
+      row.appendChild(grp); card.appendChild(row);
+    });
+    container.appendChild(card);
+  }
+  function countAll(){
+    var counts={done:0,na:0,biomed:0,pending:0};
+    currentSections().forEach(function(sec){ sec.items.forEach(function(item, idx){
+      var v = state.checks[sec.id][idx];
+      if(v==='done') counts.done++; else if(v==='na') counts.na++; else if(v==='biomed') counts.biomed++; else counts.pending++;
+    }); });
+    return counts;
+  }
+  function biomedFlags(){
+    var flags=[];
+    currentSections().forEach(function(sec){ sec.items.forEach(function(item, idx){
+      if(state.checks[sec.id][idx]==='biomed') flags.push({section:sec.title, item:item});
+    }); });
+    return flags;
+  }
+  function buildPayload(){
+    var type = currentType();
+    var payload = {
+      form:(type==='PACU' ? 'PACU Opener — PostAnesthesia Care Unit Readiness Checklist' : 'OR Opener — Preoperative Readiness Checklist'),
+      recorder:state.recorder, date:state.date, room:state.room,
+      checklist:(function(){ var out={}; currentSections().forEach(function(sec){ out[sec.title]=sec.items.map(function(item, idx){ return {item:item, status:state.checks[sec.id][idx]||null}; }); }); return out; })(),
+      temperature_c: state.temp_na?'N/A':state.temp, humidity_pct: state.humidity_na?'N/A':state.humidity,
+      abnormal_reading: state.abnormal, immediate_actions: Object.keys(state.actions).filter(function(k){return state.actions[k];}),
+      medical_gases: type==='PACU' ? state.gasesPacu : state.gases,
+      entry_status: state.late ? 'Missed Input' : 'On Time', late_reason: state.lateReason,
+      submitted_at: new Date().toISOString()
+    };
+    if(type==='PACU') payload.patient_forms_prep = state.formsPrep;
+    return payload;
+  }
+  function renderReviewPage(container){
+    container.appendChild(el('div',{class:'section-head'},[el('h2',{},[text('Review & Submit')])]));
+    container.appendChild(el('div',{class:'section-sub'},[text('Check the summary below before submitting the room as ready.')]));
+    if(state.late){
+      container.appendChild(el('div',{class:'section-note', style:'border-color:var(--danger);background:var(--danger-soft);color:var(--danger);font-weight:600;'},[
+        text('This entry will be recorded as "Missed Input" ('+(state.lateReason==='retrospective'?'retrospective entry for '+state.date:'submitted outside the 5:00 AM–12:00 NN window')+').')
+      ]));
+    }
+    var counts = countAll();
+    var stats = el('div',{class:'summary-stats'});
+    stats.appendChild(el('div',{class:'stat done'},[el('div',{class:'n'},[text(counts.done)]), el('div',{class:'l'},[text('Done')])]));
+    stats.appendChild(el('div',{class:'stat na'},[el('div',{class:'n'},[text(counts.na)]), el('div',{class:'l'},[text('N/A')])]));
+    stats.appendChild(el('div',{class:'stat biomed'},[el('div',{class:'n'},[text(counts.biomed)]), el('div',{class:'l'},[text('BioMed')])]));
+    stats.appendChild(el('div',{class:'stat pending'},[el('div',{class:'n'},[text(counts.pending)]), el('div',{class:'l'},[text('Pending')])]));
+    container.appendChild(stats);
+    var flags = biomedFlags();
+    var flagCard = el('div',{class:'card'});
+    flagCard.appendChild(el('h3',{style:'font-size:14px;color:var(--amber);margin-bottom:8px;'},[text('Items Sent to BioMed')]));
+    if(flags.length===0){ flagCard.appendChild(el('div',{class:'empty-note'},[text('None flagged.')])); }
+    else {
+      var ul = el('ul',{class:'flag-list'});
+      flags.forEach(function(f){ ul.appendChild(el('li',{},[ el('span',{},[text(f.item)]), el('span',{class:'section'},[text(f.section)]) ])); });
+      flagCard.appendChild(ul);
+    }
+    container.appendChild(flagCard);
+    if(!state.submitted){
+      var allDone = currentPages().slice(0,-1).every(function(p){ return sectionComplete(p); });
+      var btn = el('button',{class:'submit-btn'},[text(allDone ? 'Submit Room as Ready' : 'Complete All Sections First')]);
+      if(!allDone) btn.setAttribute('disabled','disabled');
+      btn.addEventListener('click', function(){
+        state.submitted = true;
+        var record = { date:state.date, room:state.room, recorder:state.recorder, late:state.late, payload:buildPayload(), submittedAt:new Date().toISOString() };
+        submittedLogs.push(record);
+        syncLogInsert(record);
+        renderApp();
+      });
+      container.appendChild(el('div',{style:'margin-top:6px;'},[btn]));
+    } else {
+      var box = el('div',{class:'confirm-box'});
+      box.appendChild(el('h3',{},[text('Room Marked Ready')]));
+      box.appendChild(el('p',{},[text(state.room+' · '+state.date+' · Recorded by '+state.recorder)]));
+      box.appendChild(el('p',{},[text('This session only — nothing has been sent to a server yet.')]));
+      var jbtn = el('button',{class:'json-toggle'},[text(state.showJson?'Hide submission data':'View submission data (JSON)')]);
+      jbtn.addEventListener('click', function(){ state.showJson=!state.showJson; renderApp(); });
+      box.appendChild(jbtn);
+      if(state.showJson) box.appendChild(el('pre',{class:'json-out'},[text(JSON.stringify(buildPayload(), null, 2))]));
+      if(hasQueuedRooms()){
+        var next = el('button',{class:'ghost-btn'},[text('Log Next: '+session.roomQueue[0])]);
+        next.addEventListener('click', function(){ beginFreshEntry(); renderApp(); });
+        box.appendChild(next);
+      } else {
+        box.appendChild(el('div',{style:'font-size:12px;color:var(--ink-soft);margin-top:12px;margin-bottom:6px;'},[text('Opening another room today?')]));
+        var chips = el('div',{class:'chip-group', style:'justify-content:center;'});
+        ROOM_OPTIONS.forEach(function(r){
+          var chip = el('button',{class:'chip'},[text(r)]);
+          chip.addEventListener('click', function(){ startAdHocEntry(r); });
+          chips.appendChild(chip);
+        });
+        box.appendChild(chips);
+      }
+      container.appendChild(box);
+    }
+  }
+
+  // ================= LOGIN SCREEN =================
+  function renderMissedBanner(container){
+    var missed = computeMissedLogs();
+    if(missed.length===0) return;
+    var box = el('div',{class:'missed-banner'});
+    box.appendChild(el('h3',{},[text('⚠ Missed Logs ('+missed.length+')')]));
+    missed.slice(0,8).forEach(function(m){
+      box.appendChild(el('div',{class:'missed-row'},[ el('span',{class:'d'},[text(m.date+' · '+m.room)]), el('span',{},[text(m.staff)]) ]));
+    });
+    if(missed.length>8) box.appendChild(el('div',{style:'font-size:11.5px;color:var(--ink-soft);margin-top:6px;'},[text('+ '+(missed.length-8)+' more')]));
+    container.appendChild(box);
+  }
+  function renderKeypad(onDigit, onBack){
+    var pad = el('div',{class:'keypad'});
+    for(var i=1;i<=9;i++){
+      (function(n){
+        var b = el('button',{class:'key-btn'},[text(String(n))]);
+        b.addEventListener('click', function(){ onDigit(String(n)); });
+        pad.appendChild(b);
+      })(i);
+    }
+    var blank = el('div',{});
+    pad.appendChild(blank);
+    var zero = el('button',{class:'key-btn'},[text('0')]);
+    zero.addEventListener('click', function(){ onDigit('0'); });
+    pad.appendChild(zero);
+    var back = el('button',{class:'key-btn util'},[text('⌫')]);
+    back.addEventListener('click', onBack);
+    pad.appendChild(back);
+    return pad;
+  }
+  function renderPinDots(len){
+    var wrap = el('div',{class:'pin-dots'});
+    for(var i=0;i<4;i++) wrap.appendChild(el('div',{class:'pin-dot'+(i<len?' filled':'')}));
+    return wrap;
+  }
+  function renderLogin(container){
+    var wrapClass = 'login-wrap';
+    if(loginFlow.step==='name') wrapClass = 'login-wrap login-wrap-wide';
+    else if(loginFlow.step==='pin') wrapClass = 'login-wrap login-wrap-medium';
+    var wrap = el('div',{class: wrapClass});
+
+    if(loginFlow.step==='name'){
+      wrap.appendChild(el('div',{class:'section-head'},[el('h2',{},[text('Who is opening today?')])]));
+      wrap.appendChild(el('div',{class:'section-sub'},[text('Select your name to continue.')]));
+
+      var scheduledToday = users.filter(function(u){ return todayScheduledRoomsFor(u.name).length>0; });
+      var others = users.filter(function(u){ return todayScheduledRoomsFor(u.name).length===0; });
+      var missed = computeMissedLogs();
+
+      var threeCol = el('div',{class:'grid-3-wrap'});
+
+      // LEFT — Missed logs
+      var missedCard = el('div',{class:'card'});
+      missedCard.appendChild(el('h3',{style:'font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--amber);margin-bottom:10px;'},[text('⚠ Missed Logs'+(missed.length>0?' ('+missed.length+')':''))]));
+      if(missed.length===0){
+        missedCard.appendChild(el('div',{class:'empty-note'},[text('None — every scheduled log is accounted for.')]));
+      } else {
+        missed.slice(0,10).forEach(function(m){
+          missedCard.appendChild(el('div',{class:'missed-row'},[ el('span',{class:'d'},[text(m.date+' · '+m.room)]), el('span',{},[text(m.staff)]) ]));
+        });
+        if(missed.length>10) missedCard.appendChild(el('div',{style:'font-size:11.5px;color:var(--ink-soft);margin-top:6px;'},[text('+ '+(missed.length-10)+' more')]));
+      }
+      threeCol.appendChild(missedCard);
+
+      // CENTER — today's scheduled openers
+      var schedCard = el('div',{class:'card'});
+      schedCard.appendChild(el('h3',{style:'font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--teal-deep);margin-bottom:10px;'},[text("Today's Scheduled Openers")]));
+      if(scheduledToday.length===0){
+        schedCard.appendChild(el('div',{class:'empty-note'},[text('No opener assignments found for today.')]));
+      } else {
+        scheduledToday.forEach(function(u){
+          var rooms = todayScheduledRoomsFor(u.name);
+          var b = el('button',{class:'name-btn', style:'width:100%;margin-bottom:8px;text-align:left;'},[ text(u.name), el('div',{style:'font-size:10.5px;color:var(--teal);font-weight:700;margin-top:4px;'},[text(rooms.join(' · '))]) ]);
+          b.addEventListener('click', function(){ selectUserForLogin(u.name); });
+          schedCard.appendChild(b);
+        });
+      }
+      threeCol.appendChild(schedCard);
+
+      // RIGHT — all other staff
+      var otherCard = el('div',{class:'card'});
+      otherCard.appendChild(el('h3',{style:'font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin-bottom:10px;'},[text(scheduledToday.length>0 ? 'All Other Staff' : 'All Staff')]));
+      others.forEach(function(u){
+        var b = el('button',{class:'name-btn', style:'width:100%;margin-bottom:8px;text-align:left;'},[text(u.name)]);
+        b.addEventListener('click', function(){ selectUserForLogin(u.name); });
+        otherCard.appendChild(b);
+      });
+      threeCol.appendChild(otherCard);
+
+      wrap.appendChild(threeCol);
+    }
+    else if(loginFlow.step==='pin'){
+      renderMissedBanner(wrap);
+      var u = loginFlow.selectedUser;
+      var pc = el('div',{class:'pin-stage'});
+      pc.appendChild(el('div',{class:'pin-user'},[text(u.name)]));
+
+      var pinCols = el('div',{class:'grid-2', style:'text-align:left;align-items:start;'});
+
+      var roomBlock = el('div',{});
+      roomBlock.appendChild(el('div',{style:'font-size:12px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;'},[text('Which room(s)/area are you opening today?')]));
+      var chipWrap = el('div',{class:'chip-group'});
+      ROOM_OPTIONS.forEach(function(r){
+        var chip = el('button',{class:'chip'+(loginFlow.selectedRooms.indexOf(r)>-1?' sel':'')},[text(r)]);
+        chip.addEventListener('click', function(){ toggleLoginRoom(r); });
+        chipWrap.appendChild(chip);
+      });
+      roomBlock.appendChild(chipWrap);
+      if(loginFlow.selectedRooms.length>0){
+        roomBlock.appendChild(el('div',{style:'font-size:11px;color:var(--ink-soft);margin-top:6px;'},[text('Pre-filled from today\'s schedule — add or remove if an opener is absent.')]));
+      }
+      if(loginFlow.roomError) roomBlock.appendChild(el('div',{class:'pin-error', style:'margin-top:6px;'},[text(loginFlow.roomError)]));
+      pinCols.appendChild(roomBlock);
+
+      var pinBlock = el('div',{style:'text-align:center;'});
+      pinBlock.appendChild(el('div',{class:'pin-sub'},[text('Enter your 4-digit PIN')]));
+      if(!u.pinChanged){
+        pinBlock.appendChild(el('div',{style:'font-size:12.5px;color:var(--teal);background:var(--teal-soft);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-weight:600;'},[text('Default PIN is '+u.pin+' — you\'ll be asked to set your own after entering it.')]));
+      }
+      pinBlock.appendChild(renderPinDots(loginFlow.pinDigits.length));
+      pinBlock.appendChild(el('div',{class:'pin-error'},[text(loginFlow.error||'')]));
+      pinBlock.appendChild(renderKeypad(pinDigitPress, pinBackspace));
+      pinCols.appendChild(pinBlock);
+
+      pc.appendChild(pinCols);
+      var afterCols = el('div',{style:'text-align:center;'});
+      if(u.pinChanged){
+        var fl = el('div',{class:'forgot-link'},[text('Forgot your PIN?')]);
+        fl.addEventListener('click', beginForgotFlow);
+        afterCols.appendChild(fl);
+      }
+      var back = el('div',{class:'back-link'},[text('← Not you? Choose a different name')]);
+      back.addEventListener('click', function(){ resetLoginFlow(); renderApp(); });
+      afterCols.appendChild(back);
+      pc.appendChild(afterCols);
+      wrap.appendChild(pc);
+    }
+    else if(loginFlow.step==='offer-setpin'){
+      var oc = el('div',{class:'card offer-card'});
+      oc.appendChild(el('h3',{style:'margin-bottom:8px;'},[text("You're using the default PIN")]));
+      oc.appendChild(el('p',{},[text('For security, set a personal 4-digit PIN now. You can skip and keep using 0000 for now — you\u2019ll be asked again next time.')]));
+      var row = el('div',{class:'btn-row'});
+      var yes = el('button',{class:'nav-btn next'},[text('Set Personal PIN')]);
+      yes.addEventListener('click', beginSetPin);
+      var skip = el('button',{class:'nav-btn prev'},[text('Skip for Now')]);
+      skip.addEventListener('click', skipSetPin);
+      row.appendChild(skip); row.appendChild(yes);
+      oc.appendChild(row); wrap.appendChild(oc);
+    }
+    else if(loginFlow.step==='setpin1' || loginFlow.step==='setpin2' || loginFlow.step==='forgot-setpin1' || loginFlow.step==='forgot-setpin2'){
+      var labelMap = {'setpin1':'Enter New PIN','setpin2':'Confirm New PIN','forgot-setpin1':'Enter New PIN','forgot-setpin2':'Confirm New PIN'};
+      var pc2 = el('div',{class:'pin-stage'});
+      pc2.appendChild(el('div',{class:'pin-user'},[text(loginFlow.selectedUser.name)]));
+      pc2.appendChild(el('div',{class:'pin-sub'},[text(labelMap[loginFlow.step])]));
+      pc2.appendChild(renderPinDots(loginFlow.pinDigits.length));
+      pc2.appendChild(el('div',{class:'pin-error'},[text(loginFlow.error||'')]));
+      pc2.appendChild(renderKeypad(setpinDigitPress, setpinBackspace));
+      wrap.appendChild(pc2);
+    }
+    else if(loginFlow.step==='setquestions'){
+      wrap.appendChild(el('div',{class:'section-head'},[el('h2',{},[text('Set Security Questions')])]));
+      wrap.appendChild(el('div',{class:'section-sub'},[text('Used only to recover your PIN later. Choose two different questions.')]));
+      var card = el('div',{class:'card'});
+      [1,2].forEach(function(n){
+        var row = el('div',{class:'field-row'});
+        row.appendChild(el('label',{},[text('Security Question '+n)]));
+        var otherSelected = (n===1) ? loginFlow.q2 : loginFlow.q1;
+        var currentVal = (n===1) ? loginFlow.q1 : loginFlow.q2;
+        var sel = el('select',{});
+        sel.appendChild(el('option',{value:''},[text('Select a question…')]));
+        SECURITY_QUESTIONS.filter(function(q){ return q!==otherSelected; }).forEach(function(q){
+          var o = el('option',{value:q},[text(q)]);
+          if(q===currentVal) o.setAttribute('selected','selected');
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', function(e){ if(n===1) loginFlow.q1=e.target.value; else loginFlow.q2=e.target.value; renderApp(); });
+        row.appendChild(sel);
+        var ans = el('input',{type:'text', placeholder:'Your answer'});
+        ans.value = (n===1) ? loginFlow.a1 : loginFlow.a2;
+        ans.addEventListener('input', function(e){ if(n===1) loginFlow.a1=e.target.value; else loginFlow.a2=e.target.value; });
+        row.appendChild(ans);
+        card.appendChild(row);
+      });
+      if(loginFlow.error) card.appendChild(el('div',{class:'pin-error'},[text(loginFlow.error)]));
+      var save = el('button',{class:'submit-btn'},[text('Save & Continue')]);
+      save.addEventListener('click', saveSecurityQuestions);
+      card.appendChild(save);
+      wrap.appendChild(card);
+    }
+    else if(loginFlow.step==='forgot-questions'){
+      var u2 = loginFlow.selectedUser;
+      wrap.appendChild(el('div',{class:'section-head'},[el('h2',{},[text('Verify Your Identity')])]));
+      var card2 = el('div',{class:'card'});
+      var r1 = el('div',{class:'field-row'});
+      r1.appendChild(el('label',{},[text(u2.secQ1)]));
+      var i1 = el('input',{type:'text'}); i1.addEventListener('input', function(e){ loginFlow.fa1=e.target.value; });
+      r1.appendChild(i1); card2.appendChild(r1);
+      var r2 = el('div',{class:'field-row'});
+      r2.appendChild(el('label',{},[text(u2.secQ2)]));
+      var i2 = el('input',{type:'text'}); i2.addEventListener('input', function(e){ loginFlow.fa2=e.target.value; });
+      r2.appendChild(i2); card2.appendChild(r2);
+      if(loginFlow.error) card2.appendChild(el('div',{class:'pin-error'},[text(loginFlow.error)]));
+      var sub = el('button',{class:'submit-btn'},[text('Verify')]);
+      sub.addEventListener('click', submitForgotAnswers);
+      card2.appendChild(sub);
+      wrap.appendChild(card2);
+    }
+    container.appendChild(wrap);
+  }
+
+  // ================= DASHBOARD =================
+  function computeDashboardStats(roomFilter){
+    var logs = submittedLogs.filter(function(l){ return roomFilter(l.room); });
+    var sched = schedule.filter(function(s){ return roomFilter(s.room); });
+    var missed = computeMissedLogs().filter(function(m){ return roomFilter(m.room); });
+    var totalBiomed=0, tempExcursions=0, lateEntries=0;
+    logs.forEach(function(l){
+      Object.keys(l.payload.checklist).forEach(function(secTitle){
+        l.payload.checklist[secTitle].forEach(function(it){ if(it.status==='biomed') totalBiomed++; });
+      });
+      if(l.payload.abnormal_reading==='Yes') tempExcursions++;
+      if(l.late) lateEntries++;
+    });
+    var scheduledToday = sched.filter(function(s){ return s.date<=new Date().toISOString().slice(0,10); }).length;
+    var completionRate = scheduledToday>0 ? Math.round((logs.length/scheduledToday)*100) : null;
+    return { count:logs.length, missed:missed, biomed:totalBiomed, temp:tempExcursions, late:lateEntries, scheduledToday:scheduledToday, completionRate:completionRate };
+  }
+
+  function renderDashboardSection(label, roomFilter){
+    var s = computeDashboardStats(roomFilter);
+    var section = el('div',{});
+    section.appendChild(el('h3',{style:'font-size:15px;margin:0 0 10px 0;color:var(--teal-deep);'},[text(label)]));
+
+    var stats = el('div',{class:'summary-stats'});
+    stats.appendChild(el('div',{class:'stat done'},[el('div',{class:'n'},[text(s.count)]), el('div',{class:'l'},[text('Logs Submitted')])]));
+    stats.appendChild(el('div',{class:'stat pending'},[el('div',{class:'n'},[text(s.missed.length)]), el('div',{class:'l'},[text('Missed Logs')])]));
+    stats.appendChild(el('div',{class:'stat biomed'},[el('div',{class:'n'},[text(s.biomed)]), el('div',{class:'l'},[text('BioMed Flags')])]));
+    stats.appendChild(el('div',{class:'stat na'},[el('div',{class:'n'},[text(s.temp)]), el('div',{class:'l'},[text('Temp/Humidity Excursions')])]));
+    section.appendChild(stats);
+
+    var stats2 = el('div',{class:'summary-stats'});
+    stats2.appendChild(el('div',{class:'stat pending'},[el('div',{class:'n'},[text(s.late)]), el('div',{class:'l'},[text('Late / Missed Input Entries')])]));
+    section.appendChild(stats2);
+
+    var card = el('div',{class:'card'});
+    card.appendChild(el('h3',{style:'font-size:14px;margin-bottom:8px;'},[text('Checklist Completion Rate')]));
+    card.appendChild(el('p',{style:'font-size:13px;color:var(--ink-soft);margin:0 0 4px 0;'},[
+      text(s.completionRate===null ? 'Upload a schedule to calculate completion against expected logs.' : (s.completionRate+'% of scheduled logs completed ('+s.count+' of '+s.scheduledToday+').'))
+    ]));
+    section.appendChild(card);
+
+    var missedCard = el('div',{class:'card'});
+    missedCard.appendChild(el('h3',{style:'font-size:14px;margin-bottom:8px;color:var(--amber);'},[text('Missed Logs Detail')]));
+    if(s.missed.length===0){ missedCard.appendChild(el('div',{class:'empty-note'},[text('None — all scheduled logs are accounted for.')])); }
+    else {
+      var ul = el('ul',{class:'flag-list'});
+      s.missed.forEach(function(m){ ul.appendChild(el('li',{},[ el('span',{},[text(m.date+' — '+m.room)]), el('span',{class:'section'},[text(m.staff)]) ])); });
+      missedCard.appendChild(ul);
+    }
+    section.appendChild(missedCard);
+    return section;
+  }
+
+  function renderDashboard(container){
+    container.appendChild(el('div',{class:'section-head'},[el('h2',{},[text('KPI Dashboard — Current Session')])]));
+    container.appendChild(el('div',{class:'section-sub'},[text('OR and PACU are tracked separately. Metrics accumulate from logs submitted in this browser session.')]));
+
+    var areaCols = el('div',{class:'grid-2', style:'align-items:start;'});
+    areaCols.appendChild(renderDashboardSection('Operating Room', isORRoom));
+    areaCols.appendChild(renderDashboardSection('PACU', isPACURoom));
+    container.appendChild(areaCols);
+
+    var note = el('div',{class:'kpi-note', style:'margin-top:6px;'});
+    note.innerHTML = '<strong>Alignment note:</strong> these indicator categories (checklist completion, equipment referred to BioMed, and environmental excursions) follow the same readiness/environment-of-care logic used in AORN Guidelines for Perioperative Practice and TJC/JCI Environment of Care equipment standards, and match how your CSSD/SPU manual is already aligned to SafeCare SE08. Map the exact thresholds and clause references to your approved OR Policy Manual before this is used for formal compliance reporting.';
+    container.appendChild(note);
+  }
+
+  // ================= ADMIN =================
+  function renderAdmin(container){
+    container.appendChild(el('div',{class:'section-head'},[el('h2',{},[text('Manage Users & Settings')])]));
+    container.appendChild(el('div',{class:'section-sub'},[text('Superuser only — roles, PIN resets, and the OR schedule feed.')]));
+
+    var gridWrap = el('div',{class:'grid-3-wrap', style:'margin-bottom:16px;'});
+
+    var card = el('div',{class:'card'});
+    card.appendChild(el('h3',{style:'font-size:14px;margin-bottom:10px;'},[text('Staff & Roles')]));
+    var list = el('div',{class:'userlist'});
+    users.forEach(function(u){
+      var row = el('div',{class:'user-row'});
+      row.appendChild(el('div',{class:'uname'},[text(u.name)]));
+      row.appendChild(el('span',{class:'badge '+(u.pinChanged?'custom':'default')},[text(u.pinChanged?'Custom PIN':'Default PIN')]));
+      if(u.fromSchedule && Object.keys(lastScheduleNames).length>0 && !lastScheduleNames[u.name.toLowerCase()]){
+        row.appendChild(el('span',{class:'badge', style:'background:var(--danger-soft);color:var(--danger);'},[text('Not on latest schedule')]));
+      }
+      var sel = el('select',{});
+      ['user','admin','superuser'].forEach(function(r){ var o=el('option',{value:r},[text(r.charAt(0).toUpperCase()+r.slice(1))]); if(u.role===r) o.setAttribute('selected','selected'); sel.appendChild(o); });
+      sel.addEventListener('change', function(e){ adminSetRole(u.name, e.target.value); });
+      row.appendChild(sel);
+      var resetBtn = el('button',{class:'mini-btn'},[text('Reset PIN')]);
+      resetBtn.addEventListener('click', function(){ adminResetPin(u.name); });
+      row.appendChild(resetBtn);
+      var delBtn = el('button',{class:'mini-btn'},[text('Delete')]);
+      if(session.user && session.user.name===u.name){ delBtn.setAttribute('disabled','disabled'); delBtn.style.opacity='0.35'; delBtn.title='You cannot delete your own account while logged in.'; }
+      else { delBtn.addEventListener('click', function(){ adminDeleteUser(u.name); }); }
+      row.appendChild(delBtn);
+      list.appendChild(row);
+    });
+    card.appendChild(list);
+
+    var addRow = el('div',{class:'grid-2', style:'margin-top:16px;'});
+    var nameInp = el('input',{type:'text', placeholder:'New staff name'});
+    var roleSel = el('select',{});
+    ['user','admin','superuser'].forEach(function(r){ roleSel.appendChild(el('option',{value:r},[text(r.charAt(0).toUpperCase()+r.slice(1))])); });
+    addRow.appendChild(nameInp); addRow.appendChild(roleSel);
+    card.appendChild(addRow);
+    var addBtn = el('button',{class:'ghost-btn'},[text('Add Staff Member')]);
+    addBtn.addEventListener('click', function(){ adminAddUser(nameInp.value, roleSel.value); nameInp.value=''; });
+    card.appendChild(addBtn);
+    gridWrap.appendChild(card);
+
+    var csvCard = el('div',{class:'card'});
+    csvCard.appendChild(el('h3',{style:'font-size:14px;margin-bottom:6px;'},[text('OR Schedule')]));
+    csvCard.appendChild(el('p',{style:'font-size:12.5px;color:var(--ink-soft);margin:0 0 10px 0;'},[text('Upload the monthly OR duty schedule export (the NAME / day-columns format). Room "Opener" assignments are read from cells that both start with a 7 (7am shift, not 7:30) and mention OR1/OR2/OR3, under the NURSES section — later shifts in the same room don\'t count as the opener. New staff found anywhere in the NURSES section are still added automatically. This feeds room auto-fill, missed-log responsibility, and the login screen\'s roster match.')]));
+    var fileInp = el('input',{type:'file', accept:'.csv'});
+    fileInp.addEventListener('change', function(e){ if(e.target.files[0]) handleScheduleCSV(e.target.files[0]); });
+    csvCard.appendChild(fileInp);
+    if(lastScheduleImport){
+      if(lastScheduleImport.error){
+        csvCard.appendChild(el('div',{class:'pin-error', style:'margin-top:10px;'},[text(lastScheduleImport.error)]));
+      } else {
+        var msg = lastScheduleImport.totalRows+' room assignments loaded'+(lastScheduleImport.monthLabel? ' for '+titleCaseName(lastScheduleImport.monthLabel):'')+'.'
+          +(lastScheduleImport.addedCount>0? ' '+lastScheduleImport.addedCount+' new staff auto-registered (default PIN 0000).':'')
+          +(lastScheduleImport.removedCount>0? ' '+lastScheduleImport.removedCount+' removed (no longer on schedule, never customized their PIN).':'')
+          +(lastScheduleImport.flaggedCount>0? ' '+lastScheduleImport.flaggedCount+' not on this schedule but kept since they already set up a personal PIN — flagged below for manual review.':'');
+        csvCard.appendChild(el('p',{style:'font-size:12px;color:var(--teal-deep);margin:10px 0 6px 0;font-weight:600;'},[text(msg)]));
+      }
+    }
+    if(schedule.length>0){
+      var tbl = el('table',{class:'data-table'});
+      var thead = el('tr',{},[el('th',{},[text('Date')]), el('th',{},[text('Room')]), el('th',{},[text('Staff')])]);
+      tbl.appendChild(thead);
+      schedule.slice(0,10).forEach(function(s){ tbl.appendChild(el('tr',{},[el('td',{},[text(s.date)]), el('td',{},[text(s.room)]), el('td',{},[text(s.staff)])])); });
+      var tblScroll2 = el('div',{class:'table-scroll'}); tblScroll2.appendChild(tbl);
+      csvCard.appendChild(tblScroll2);
+      if(schedule.length>10) csvCard.appendChild(el('div',{style:'font-size:11px;color:var(--ink-soft);margin-top:6px;'},[text('+ '+(schedule.length-10)+' more rows')]));
+    }
+    gridWrap.appendChild(csvCard);
+
+    renderCorrectionsCard(gridWrap);
+    container.appendChild(gridWrap);
+    renderKPIReportCard(container);
+  }
+
+  function renderCorrectionsCard(container){
+    var card = el('div',{class:'card'});
+    card.appendChild(el('h3',{style:'font-size:14px;margin-bottom:6px;'},[text('Schedule Name Corrections')]));
+    card.appendChild(el('p',{style:'font-size:12.5px;color:var(--ink-soft);margin:0 0 10px 0;'},[text('If a name is misspelled on the schedule file (e.g. a typo when the duty roster is typed up), map it here so it always resolves to the correct staff account — including on schedules you upload later.')]));
+    scheduleNameCorrections.forEach(function(c, idx){
+      var row = el('div',{class:'user-row'});
+      row.appendChild(el('div',{class:'uname'},[text(c.from+' → '+c.to)]));
+      var delBtn = el('button',{class:'mini-btn'},[text('Remove')]);
+      delBtn.addEventListener('click', function(){ scheduleNameCorrections.splice(idx,1); syncCorrectionsReplace(); renderApp(); });
+      row.appendChild(delBtn);
+      card.appendChild(row);
+    });
+    var addRow = el('div',{class:'grid-2', style:'margin-top:10px;'});
+    var fromInp = el('input',{type:'text', placeholder:'Spelling on the schedule'});
+    var toInp = el('input',{type:'text', placeholder:'Correct staff name'});
+    addRow.appendChild(fromInp); addRow.appendChild(toInp);
+    card.appendChild(addRow);
+    var addBtn = el('button',{class:'ghost-btn'},[text('Add Correction')]);
+    addBtn.addEventListener('click', function(){
+      if(!fromInp.value.trim() || !toInp.value.trim()) return;
+      scheduleNameCorrections.push({ from:fromInp.value.trim(), to:toInp.value.trim() });
+      syncCorrectionsReplace();
+      renderApp();
+    });
+    card.appendChild(addBtn);
+    card.appendChild(el('p',{style:'font-size:11px;color:var(--ink-soft);margin-top:8px;'},[text('Re-upload the schedule after adding a correction so it takes effect immediately.')]));
+    container.appendChild(card);
+  }
+
+  // ================= KPI INDICATOR REPORT (FRM-011) =================
+  function isORRoom(r){ return r==='OR1'||r==='OR2'||r==='OR3'; }
+  function isPACURoom(r){ return r==='PACU'; }
+
+  var KPI_DEFS = {
+    or_completion: { title:'OR Opener Preoperative Readiness Checklist Completion Rate', type:'Process', area:'OR',
+      prioritization:['Patient Safety (IPSG)','P&P Compliance'],
+      numDesc:'Number of OR Opener readiness checklists completed', denDesc:'Number of OR Opener readiness checklists scheduled (per OR schedule)',
+      inclusion:'All OR1/OR2/OR3 opener assignments (7am shift) on the OR duty schedule within the reporting period.',
+      exclusion:'Rooms with no opener scheduled that day; days with no case list.',
+      rationale:'Timely completion of the OR Opener checklist is a direct patient-safety control before the first case of the day.',
+      sampleSize:'100% census — every scheduled opener assignment in the period, not a sample.',
+      tools:'Automated capture via the OR/PACU Opener Readiness App.', benchmark:'To be set by QPS/Department', target:'100%' },
+    pacu_completion: { title:'PACU Opener Readiness Checklist Completion Rate', type:'Process', area:'PACU',
+      prioritization:['Patient Safety (IPSG)','P&P Compliance'],
+      numDesc:'Number of PACU Opener readiness checklists completed', denDesc:'Number of PACU Opener readiness checklists scheduled (per schedule)',
+      inclusion:'All PACU opener assignments (8am shift) on the duty schedule within the reporting period.',
+      exclusion:'Days with no PACU opener scheduled.',
+      rationale:'Timely PACU readiness protects patients in the immediate post-anesthesia period.',
+      sampleSize:'100% census — every scheduled opener assignment in the period, not a sample.',
+      tools:'Automated capture via the OR/PACU Opener Readiness App.', benchmark:'To be set by QPS/Department', target:'100%' },
+    or_biomed: { title:'OR Equipment Referred to BioMed Rate', type:'Process', area:'OR',
+      prioritization:['Patient Safety (IPSG)','High Risk'],
+      numDesc:'Number of OR equipment items flagged "Sent to BioMed" during readiness checks', denDesc:'Total number of OR equipment items checked during readiness checks',
+      inclusion:'All equipment items checked during a submitted OR Opener checklist within the period.',
+      exclusion:'Items marked Not Applicable.',
+      rationale:'Tracks equipment reliability and flags recurring maintenance needs before they affect a case.',
+      sampleSize:'100% census — every equipment item checked in the period, not a sample.',
+      tools:'Automated capture via the OR/PACU Opener Readiness App.', benchmark:'To be set by QPS/Department', target:'0%' },
+    pacu_biomed: { title:'PACU Equipment Referred to BioMed Rate', type:'Process', area:'PACU',
+      prioritization:['Patient Safety (IPSG)','High Risk'],
+      numDesc:'Number of PACU equipment items flagged "Sent to BioMed" during readiness checks', denDesc:'Total number of PACU equipment items checked during readiness checks',
+      inclusion:'All equipment items checked during a submitted PACU Opener checklist within the period.',
+      exclusion:'Items marked Not Applicable.',
+      rationale:'Tracks equipment reliability and flags recurring maintenance needs before patients are received.',
+      sampleSize:'100% census — every equipment item checked in the period, not a sample.',
+      tools:'Automated capture via the OR/PACU Opener Readiness App.', benchmark:'To be set by QPS/Department', target:'0%' },
+    or_climate: { title:'OR Storage Area Temperature & Humidity Excursion Rate', type:'Outcome', area:'OR',
+      prioritization:['Patient Safety (IPSG)'],
+      numDesc:'Number of OR readiness checks with an abnormal temperature/humidity reading', denDesc:'Total number of OR readiness checks performed',
+      inclusion:'All submitted OR Opener checklists within the period.', exclusion:'None.',
+      rationale:'Storage conditions outside range risk compromising sterile supply integrity.',
+      sampleSize:'100% census — every submitted checklist in the period, not a sample.',
+      tools:'Automated capture via the OR/PACU Opener Readiness App.', benchmark:'To be set by QPS/Department', target:'0%' },
+    pacu_climate: { title:'PACU Storage Area Temperature & Humidity Excursion Rate', type:'Outcome', area:'PACU',
+      prioritization:['Patient Safety (IPSG)'],
+      numDesc:'Number of PACU readiness checks with an abnormal temperature/humidity reading', denDesc:'Total number of PACU readiness checks performed',
+      inclusion:'All submitted PACU Opener checklists within the period.', exclusion:'None.',
+      rationale:'Storage conditions outside range risk compromising sterile supply integrity.',
+      sampleSize:'100% census — every submitted checklist in the period, not a sample.',
+      tools:'Automated capture via the OR/PACU Opener Readiness App.', benchmark:'To be set by QPS/Department', target:'0%' }
+  };
+  var PRIORITIZATION_OPTS = ['High Risk','High Volume','Problem Prone','High Cost','P&P Compliance','Patient Safety (IPSG)'];
+  var TYPE_OPTS = ['Structure','Process','Outcome','Process and Outcome'];
+  var REPORTING_OPTS = ['Monthly','Quarterly','Bi-Annual','Annual'];
+  var MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  function freshKpiReport(){
+    var d = KPI_DEFS.or_completion;
+    var now = new Date();
+    return {
+      kpiId:'or_completion', title:d.title, owner:(session.user?session.user.name:''), type:d.type, prioritization:(function(){ var o={}; d.prioritization.forEach(function(p){o[p]=true;}); return o; })(),
+      inclusion:d.inclusion, exclusion:d.exclusion, rationale:d.rationale, unit:'Operating Room', sampleSize:d.sampleSize,
+      dataCollection:'Concurrent', tools:d.tools, reporting:'Monthly', benchmark:d.benchmark, target:d.target,
+      analysis:'', analysisAuto:true, actionRows:[],
+      responsiblePerson: session.user? session.user.name : '', receivedBy:'', showDetails:false,
+      year: now.getFullYear(), startMonth: now.getFullYear()+'-01', endMonth: now.toISOString().slice(0,7)
+    };
+  }
+  var kpiReport = freshKpiReport();
+
+  function applyKpiPreset(id){
+    var d = KPI_DEFS[id]; if(!d) return;
+    kpiReport.kpiId = id; kpiReport.title = d.title; kpiReport.type = d.type;
+    kpiReport.unit = d.area==='PACU' ? 'PACU' : 'Operating Room';
+    kpiReport.prioritization = {}; d.prioritization.forEach(function(p){ kpiReport.prioritization[p]=true; });
+    kpiReport.inclusion = d.inclusion; kpiReport.exclusion = d.exclusion; kpiReport.rationale = d.rationale;
+    kpiReport.sampleSize = d.sampleSize; kpiReport.tools = d.tools; kpiReport.benchmark = d.benchmark; kpiReport.target = d.target;
+    kpiReport.analysisAuto = true;
+    refreshAutoAnalysis();
+  }
+
+  function refreshAutoAnalysis(){
+    if(!kpiReport.analysisAuto) return;
+    var months = computeKPIMonthly(kpiReport.kpiId, kpiReport.year);
+    var inRange = function(mk){ return mk>=kpiReport.startMonth && mk<=kpiReport.endMonth; };
+    var totalNum=0, totalDen=0, monthsWithData=0;
+    months.forEach(function(mo){ if(inRange(mo.mk) && mo.den>0){ totalNum+=mo.num; totalDen+=mo.den; monthsWithData++; } });
+    if(totalDen===0){ kpiReport.analysis = 'No data recorded yet for the selected reporting period.'; return; }
+    var rate = Math.round((totalNum/totalDen)*1000)/10;
+    var base = kpiReport.kpiId.replace(/^(or_|pacu_)/,'');
+    var label = base==='completion' ? 'completed' : (base==='biomed' ? 'referred to BioMed' : 'showed an abnormal reading');
+    kpiReport.analysis = totalNum+' of '+totalDen+' ('+rate+'%) '+label+' across '+monthsWithData+' month(s) in the reporting period ('+kpiReport.startMonth+' to '+kpiReport.endMonth+').';
+  }
+
+  function computeKPIMonthly(kpiId, year){
+    var def = KPI_DEFS[kpiId];
+    var roomFilter = def.area==='PACU' ? isPACURoom : isORRoom;
+    var base = kpiId.replace(/^(or_|pacu_)/,'');
+    var months = [];
+    for(var m=1;m<=12;m++){
+      var mk = year+'-'+String(m).padStart(2,'0');
+      var num=0, den=0;
+      if(base==='completion'){
+        var schedSet = {};
+        schedule.forEach(function(s){ if(s.date && s.date.slice(0,7)===mk && roomFilter(s.room)) schedSet[s.date+'|'+s.room]=true; });
+        den = Object.keys(schedSet).length;
+        num = submittedLogs.filter(function(l){ return l.date.slice(0,7)===mk && roomFilter(l.room); }).length;
+      } else if(base==='biomed'){
+        submittedLogs.filter(function(l){ return l.date.slice(0,7)===mk && roomFilter(l.room); }).forEach(function(l){
+          Object.keys(l.payload.checklist).forEach(function(sec){
+            l.payload.checklist[sec].forEach(function(it){ den++; if(it.status==='biomed') num++; });
+          });
+        });
+      } else if(base==='climate'){
+        submittedLogs.filter(function(l){ return l.date.slice(0,7)===mk && roomFilter(l.room); }).forEach(function(l){ den++; if(l.payload.abnormal_reading==='Yes') num++; });
+      }
+      months.push({ m:m, mk:mk, num:num, den:den, rate: den>0 ? Math.round((num/den)*1000)/10 : null });
+    }
+    return months;
+  }
+
+  function renderKPIReportCard(container){
+    var card = el('div',{class:'card'});
+    card.appendChild(el('h3',{style:'font-size:14px;margin-bottom:4px;'},[text('KPI Indicator Report')]));
+    card.appendChild(el('p',{style:'font-size:12.5px;color:var(--ink-soft);margin:0 0 14px 0;'},[text('Pick an indicator and a date range — everything else fills in automatically from your submitted logs and schedule.')]));
+
+    var kpiRow = el('div',{class:'field-row'});
+    kpiRow.appendChild(el('label',{},[text('Indicator')]));
+    var kpiSel = el('select',{});
+    Object.keys(KPI_DEFS).forEach(function(id){ var o=el('option',{value:id},[text(KPI_DEFS[id].title)]); if(kpiReport.kpiId===id) o.setAttribute('selected','selected'); kpiSel.appendChild(o); });
+    kpiSel.addEventListener('change', function(e){ applyKpiPreset(e.target.value); renderApp(); });
+    kpiRow.appendChild(kpiSel);
+    card.appendChild(kpiRow);
+
+    var rangeGrid = el('div',{class:'grid-2'});
+    var startRow = el('div',{class:'field-row'});
+    startRow.appendChild(el('label',{},[text('Range Start')]));
+    var startInp = el('input',{type:'month'}); startInp.value = kpiReport.startMonth;
+    startInp.addEventListener('change', function(e){ kpiReport.startMonth=e.target.value; kpiReport.year=parseInt(e.target.value.slice(0,4),10); refreshAutoAnalysis(); renderApp(); });
+    startRow.appendChild(startInp); rangeGrid.appendChild(startRow);
+    var endRow = el('div',{class:'field-row'});
+    endRow.appendChild(el('label',{},[text('Range End')]));
+    var endInp = el('input',{type:'month'}); endInp.value = kpiReport.endMonth;
+    endInp.addEventListener('change', function(e){ kpiReport.endMonth=e.target.value; refreshAutoAnalysis(); renderApp(); });
+    endRow.appendChild(endInp); rangeGrid.appendChild(endRow);
+    card.appendChild(rangeGrid);
+
+    var months = computeKPIMonthly(kpiReport.kpiId, kpiReport.year);
+    var inRange = function(mk){ return mk>=kpiReport.startMonth && mk<=kpiReport.endMonth; };
+
+    var btnRow = el('div',{class:'btn-row', style:'margin-top:4px;margin-bottom:16px;flex-wrap:wrap;'});
+    var wordBtn = el('button',{class:'nav-btn prev'},[text('Download Word')]);
+    wordBtn.addEventListener('click', function(){ downloadWordReport(months, inRange); });
+    var pdfBtn = el('button',{class:'nav-btn next'},[text('Download PDF')]);
+    pdfBtn.addEventListener('click', function(){ printKpiReport(months, inRange); });
+    var copyBtn = el('button',{class:'nav-btn prev'},[text('Copy')]);
+    copyBtn.addEventListener('click', function(){ copyKpiReport(months, inRange); });
+    btnRow.appendChild(wordBtn); btnRow.appendChild(copyBtn); btnRow.appendChild(pdfBtn);
+    card.appendChild(btnRow);
+    var copyMsg = el('div',{id:'copyMsg', style:'font-size:11.5px;color:var(--green);margin-top:-10px;margin-bottom:14px;height:14px;'});
+    card.appendChild(copyMsg);
+
+    // Monthly aggregation preview (auto-computed, read-only)
+    card.appendChild(el('h3',{style:'font-size:13px;margin:6px 0 8px 0;'},[text('Data Aggregation — '+kpiReport.year)]));
+    var tbl = el('table',{class:'data-table'});
+    var headRow = el('tr',{}); headRow.appendChild(el('th',{},[text('Month')]));
+    months.forEach(function(mo){ headRow.appendChild(el('th',{},[text(MONTH_ABBR[mo.m-1])])); });
+    tbl.appendChild(headRow);
+    var numRow = el('tr',{}); numRow.appendChild(el('td',{},[el('strong',{},[text('Numerator')])]));
+    var denRow = el('tr',{}); denRow.appendChild(el('td',{},[el('strong',{},[text('Denominator')])]));
+    var rateRow = el('tr',{}); rateRow.appendChild(el('td',{},[el('strong',{},[text('Rate (%)')])]));
+    months.forEach(function(mo){
+      var within = inRange(mo.mk);
+      numRow.appendChild(el('td',{},[text(within? String(mo.num) : '—')]));
+      denRow.appendChild(el('td',{},[text(within? String(mo.den) : '—')]));
+      rateRow.appendChild(el('td',{},[text(within && mo.rate!==null ? mo.rate+'%' : '—')]));
+    });
+    tbl.appendChild(numRow); tbl.appendChild(denRow); tbl.appendChild(rateRow);
+    var tblScroll = el('div',{class:'table-scroll'}); tblScroll.appendChild(tbl);
+    card.appendChild(tblScroll);
+
+    var analysisPreview = el('div',{class:'kpi-note', style:'margin-top:10px;'});
+    analysisPreview.appendChild(el('strong',{},[text('Auto-generated summary: ')]));
+    analysisPreview.appendChild(text(kpiReport.analysis||'—'));
+    card.appendChild(analysisPreview);
+
+    var toggle = el('button',{class:'json-toggle', style:'margin-top:14px;'},[text(kpiReport.showDetails ? 'Hide report details' : 'Edit report details (title, owner, benchmark, action plan…)')]);
+    toggle.addEventListener('click', function(){ kpiReport.showDetails=!kpiReport.showDetails; renderApp(); });
+    card.appendChild(toggle);
+
+    if(kpiReport.showDetails){
+      var d = KPI_DEFS[kpiReport.kpiId];
+      var details = el('div',{style:'margin-top:14px;border-top:1px solid var(--line);padding-top:14px;'});
+
+      var titleRow = el('div',{class:'field-row'});
+      titleRow.appendChild(el('label',{},[text('Title')]));
+      var titleInp = el('input',{type:'text'}); titleInp.value = kpiReport.title;
+      titleInp.addEventListener('input', function(e){ kpiReport.title=e.target.value; });
+      titleRow.appendChild(titleInp); details.appendChild(titleRow);
+
+      var metaGrid = el('div',{class:'grid-2'});
+      var ownerRow = el('div',{class:'field-row'});
+      ownerRow.appendChild(el('label',{},[text('Owner')]));
+      var ownerInp = el('input',{type:'text', placeholder:'e.g. OR Nurse Manager'}); ownerInp.value = kpiReport.owner;
+      ownerInp.addEventListener('input', function(e){ kpiReport.owner=e.target.value; });
+      ownerRow.appendChild(ownerInp); metaGrid.appendChild(ownerRow);
+      var unitRow = el('div',{class:'field-row'});
+      unitRow.appendChild(el('label',{},[text('Unit / Department')]));
+      var unitInp = el('input',{type:'text'}); unitInp.value = kpiReport.unit;
+      unitInp.addEventListener('input', function(e){ kpiReport.unit=e.target.value; });
+      unitRow.appendChild(unitInp); metaGrid.appendChild(unitRow);
+      details.appendChild(metaGrid);
+
+      var typeRow = el('div',{class:'field-row'});
+      typeRow.appendChild(el('label',{},[text('Type')]));
+      var typeChips = el('div',{class:'chip-group'});
+      TYPE_OPTS.forEach(function(t){
+        var chip = el('button',{class:'chip'+(kpiReport.type===t?' sel':'')},[text(t)]);
+        chip.addEventListener('click', function(){ kpiReport.type=t; renderApp(); });
+        typeChips.appendChild(chip);
+      });
+      typeRow.appendChild(typeChips); details.appendChild(typeRow);
+
+      var prioRow = el('div',{class:'field-row'});
+      prioRow.appendChild(el('label',{},[text('Prioritization Criteria')]));
+      var prioChips = el('div',{class:'chip-group'});
+      PRIORITIZATION_OPTS.forEach(function(p){
+        var chip = el('button',{class:'chip'+(kpiReport.prioritization[p]?' sel':'')},[text(p)]);
+        chip.addEventListener('click', function(){ kpiReport.prioritization[p]=!kpiReport.prioritization[p]; renderApp(); });
+        prioChips.appendChild(chip);
+      });
+      prioRow.appendChild(prioChips); details.appendChild(prioRow);
+
+      var calcCard = el('div',{style:'background:var(--surface-alt);border-radius:10px;padding:10px 12px;margin-bottom:16px;font-size:12.5px;color:var(--ink-soft);'});
+      calcCard.appendChild(el('div',{},[el('strong',{},[text('Numerator: ')]), text(d.numDesc)]));
+      calcCard.appendChild(el('div',{style:'margin-top:4px;'},[el('strong',{},[text('Denominator: ')]), text(d.denDesc)]));
+      details.appendChild(calcCard);
+
+      [['inclusion','Inclusion Criteria'],['exclusion','Exclusion Criteria'],['rationale','Rationale'],['sampleSize','Sample Size & Sampling Plan'],['tools','Data Collection — Process & Tools'],['benchmark','Benchmark'],['target','Target']].forEach(function(f){
+        var row = el('div',{class:'field-row'});
+        row.appendChild(el('label',{},[text(f[1])]));
+        var ta = el('textarea',{rows:'2'}); ta.value = kpiReport[f[0]];
+        ta.addEventListener('input', function(e){ kpiReport[f[0]]=e.target.value; });
+        row.appendChild(ta); details.appendChild(row);
+      });
+
+      var analysisRow = el('div',{class:'field-row'});
+      var analysisLabelRow = el('div',{class:'field-label-row'});
+      analysisLabelRow.appendChild(el('label',{},[text('Analysis and Findings')]));
+      var autoBadge = el('button',{class:'chip chip-sm'+(kpiReport.analysisAuto?' sel':'')},[text(kpiReport.analysisAuto?'Auto':'Manual')]);
+      autoBadge.addEventListener('click', function(){ kpiReport.analysisAuto=!kpiReport.analysisAuto; if(kpiReport.analysisAuto) refreshAutoAnalysis(); renderApp(); });
+      analysisLabelRow.appendChild(autoBadge);
+      analysisRow.appendChild(analysisLabelRow);
+      var analysisTa = el('textarea',{rows:'3'}); analysisTa.value = kpiReport.analysis; analysisTa.disabled = kpiReport.analysisAuto;
+      analysisTa.addEventListener('input', function(e){ kpiReport.analysis=e.target.value; });
+      analysisRow.appendChild(analysisTa); details.appendChild(analysisRow);
+
+      var dcRow = el('div',{class:'field-row'});
+      dcRow.appendChild(el('label',{},[text('Data Collection')]));
+      var dcChips = el('div',{class:'chip-group'});
+      ['Retrospective','Concurrent'].forEach(function(v){
+        var chip = el('button',{class:'chip'+(kpiReport.dataCollection===v?' sel':'')},[text(v)]);
+        chip.addEventListener('click', function(){ kpiReport.dataCollection=v; renderApp(); });
+        dcChips.appendChild(chip);
+      });
+      dcRow.appendChild(dcChips); details.appendChild(dcRow);
+
+      var repRow = el('div',{class:'field-row'});
+      repRow.appendChild(el('label',{},[text('Reporting Frequency')]));
+      var repChips = el('div',{class:'chip-group'});
+      REPORTING_OPTS.forEach(function(v){
+        var chip = el('button',{class:'chip'+(kpiReport.reporting===v?' sel':'')},[text(v)]);
+        chip.addEventListener('click', function(){ kpiReport.reporting=v; renderApp(); });
+        repChips.appendChild(chip);
+      });
+      repRow.appendChild(repChips); details.appendChild(repRow);
+
+      details.appendChild(el('h3',{style:'font-size:13px;margin:16px 0 8px 0;'},[text('Action Plan / Action Taken (optional)')]));
+      kpiReport.actionRows.forEach(function(row, idx){
+        var arow = el('div',{class:'grid-2', style:'margin-bottom:8px;'});
+        var a1 = el('input',{type:'text', placeholder:'Recommended action'}); a1.value=row.action;
+        a1.addEventListener('input', function(e){ row.action=e.target.value; });
+        var a2 = el('input',{type:'text', placeholder:'Person responsible'}); a2.value=row.person;
+        a2.addEventListener('input', function(e){ row.person=e.target.value; });
+        arow.appendChild(a1); arow.appendChild(a2);
+        details.appendChild(arow);
+        var arow2 = el('div',{class:'grid-2', style:'margin-bottom:8px;'});
+        var a3 = el('input',{type:'text', placeholder:'Deadline'}); a3.value=row.deadline;
+        a3.addEventListener('input', function(e){ row.deadline=e.target.value; });
+        var a4 = el('input',{type:'text', placeholder:'Status'}); a4.value=row.status;
+        a4.addEventListener('input', function(e){ row.status=e.target.value; });
+        arow2.appendChild(a3); arow2.appendChild(a4);
+        details.appendChild(arow2);
+      });
+      var addActionBtn = el('button',{class:'mini-btn', style:'margin-bottom:14px;'},[text('+ Add Action Row')]);
+      addActionBtn.addEventListener('click', function(){ kpiReport.actionRows.push({action:'',person:'',deadline:'',status:''}); renderApp(); });
+      details.appendChild(addActionBtn);
+
+      var sigGrid = el('div',{class:'grid-2'});
+      var rpRow = el('div',{class:'field-row'});
+      rpRow.appendChild(el('label',{},[text('Responsible Person / Department')]));
+      var rpInp = el('input',{type:'text'}); rpInp.value = kpiReport.responsiblePerson;
+      rpInp.addEventListener('input', function(e){ kpiReport.responsiblePerson=e.target.value; });
+      rpRow.appendChild(rpInp); sigGrid.appendChild(rpRow);
+      var rbRow = el('div',{class:'field-row'});
+      rbRow.appendChild(el('label',{},[text('Received by QPS Office')]));
+      var rbInp = el('input',{type:'text'}); rbInp.value = kpiReport.receivedBy;
+      rbInp.addEventListener('input', function(e){ kpiReport.receivedBy=e.target.value; });
+      rbRow.appendChild(rbInp); sigGrid.appendChild(rbRow);
+      details.appendChild(sigGrid);
+
+      card.appendChild(details);
+    }
+
+    container.appendChild(card);
+  }
+
+  function buildKpiReportBodyHTML(months, inRange){
+    var prio = Object.keys(kpiReport.prioritization).filter(function(k){return kpiReport.prioritization[k];}).join(', ') || '—';
+    var today = new Date().toLocaleDateString();
+    var d = KPI_DEFS[kpiReport.kpiId];
+
+    function fieldRow(label, value){
+      return '<div class="pr-field"><div class="pr-label">'+escapeHtml(label)+'</div><div class="pr-value">'+(value && String(value).trim() ? escapeHtml(value) : '—')+'</div></div>';
+    }
+
+    var html = '';
+    html += '<div class="pr-head"><div class="pr-org">TEBOW CURE CHILDREN\'S HOSPITAL</div><div class="pr-org-sub">OF THE PHILIPPINES</div><h1>KEY PERFORMANCE INDICATOR REPORT</h1></div>';
+
+    html += '<div class="pr-box">';
+    html += fieldRow('Title', kpiReport.title);
+    html += fieldRow('Owner', kpiReport.owner);
+    html += fieldRow('Type', kpiReport.type);
+    html += fieldRow('Prioritization Criteria', prio);
+    html += fieldRow('Numerator', d.numDesc);
+    html += fieldRow('Denominator', d.denDesc);
+    html += fieldRow('Inclusion Criteria', kpiReport.inclusion);
+    html += fieldRow('Exclusion Criteria', kpiReport.exclusion);
+    html += fieldRow('Rationale', kpiReport.rationale);
+    html += fieldRow('Unit / Department', kpiReport.unit);
+    html += fieldRow('Sample Size & Sampling Plan', kpiReport.sampleSize);
+    html += fieldRow('Data Collection', kpiReport.dataCollection+' — '+(kpiReport.tools||'—'));
+    html += fieldRow('Reporting', kpiReport.reporting);
+    html += fieldRow('Benchmark', kpiReport.benchmark);
+    html += fieldRow('Target', kpiReport.target);
+    html += fieldRow('Reporting Period', kpiReport.startMonth+' to '+kpiReport.endMonth);
+    html += '</div>';
+
+    html += '<table class="pr-table">';
+    html += '<tr><th>Month</th>'+months.map(function(mo){return '<th>'+MONTH_ABBR[mo.m-1]+' '+String(kpiReport.year).slice(2)+'</th>';}).join('')+'</tr>';
+    html += '<tr><td><strong>Numerator</strong></td>'+months.map(function(mo){return '<td>'+(inRange(mo.mk)?mo.num:'—')+'</td>';}).join('')+'</tr>';
+    html += '<tr><td><strong>Denominator</strong></td>'+months.map(function(mo){return '<td>'+(inRange(mo.mk)?mo.den:'—')+'</td>';}).join('')+'</tr>';
+    html += '<tr><td><strong>Rate (%)</strong></td>'+months.map(function(mo){return '<td>'+(inRange(mo.mk)&&mo.rate!==null?mo.rate+'%':'—')+'</td>';}).join('')+'</tr>';
+    html += '</table>';
+
+    html += '<div class="pr-box">'+fieldRow('Analysis and Findings', kpiReport.analysis)+'</div>';
+
+    html += '<table class="pr-table">';
+    html += '<tr><th>Recommended Action</th><th>Person Responsible</th><th>Deadline</th><th>Status</th></tr>';
+    html += kpiReport.actionRows.map(function(r){
+      return '<tr><td>'+escapeHtml(r.action||'—')+'</td><td>'+escapeHtml(r.person||'—')+'</td><td>'+escapeHtml(r.deadline||'—')+'</td><td>'+escapeHtml(r.status||'—')+'</td></tr>';
+    }).join('');
+    html += '</table>';
+
+    html += '<div class="pr-sig"><div>Responsible Person/Department: <strong>'+escapeHtml(kpiReport.responsiblePerson||'—')+'</strong> &nbsp; Sign: _______________</div>'+
+      '<div style="margin-top:10px;">Received by Quality &amp; Patient Safety Office: <strong>'+escapeHtml(kpiReport.receivedBy||'—')+'</strong> &nbsp; Sign: _______________</div></div>';
+
+    html += '<div class="pr-foot">KPI INDICATOR REPORT FORM &nbsp; '+today+' &nbsp; VER.1 &nbsp; TCCH/QPS/FRM/011</div>';
+    return html;
+  }
+
+  function printKpiReport(months, inRange){
+    var pa = document.getElementById('printArea');
+    pa.innerHTML = buildKpiReportBodyHTML(months, inRange);
+    window.print();
+  }
+  function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // Word export: wraps the same report markup in Word-compatible HTML (the standard
+  // technique Word uses to open .doc files) rather than generating true OOXML —
+  // no extra library needed, and Word opens it as a normal editable document.
+  var WORD_REPORT_CSS = ''
+    +'body{font-family:Calibri,Arial,sans-serif;color:#10262B;font-size:11pt;}'
+    +'.pr-head{text-align:center;margin-bottom:16pt;}'
+    +'.pr-org{font-size:16pt;font-weight:800;color:#2F8F5B;letter-spacing:1pt;}'
+    +'.pr-org-sub{font-size:9pt;letter-spacing:2pt;color:#5B6E70;margin-bottom:8pt;}'
+    +'.pr-head h1{font-size:14pt;font-weight:800;border-top:2pt solid #10262B;border-bottom:2pt solid #10262B;padding:6pt 0;margin-top:6pt;}'
+    +'.pr-box{border:1.5pt solid #10262B;margin-bottom:14pt;border-collapse:collapse;width:100%;}'
+    +'.pr-field{display:table;width:100%;border-bottom:1pt solid #10262B;font-size:10pt;}'
+    +'.pr-label{display:table-cell;width:34%;font-weight:700;padding:5pt 8pt;border-right:1pt solid #10262B;vertical-align:top;}'
+    +'.pr-value{display:table-cell;width:66%;padding:5pt 8pt;vertical-align:top;}'
+    +'.pr-table{width:100%;border-collapse:collapse;margin-bottom:14pt;font-size:10pt;}'
+    +'.pr-table th,.pr-table td{border:1pt solid #10262B;padding:4pt 6pt;text-align:center;}'
+    +'.pr-table td:first-child,.pr-table th:first-child{text-align:left;}'
+    +'.pr-sig{font-size:10pt;margin-top:10pt;}'
+    +'.pr-foot{margin-top:24pt;font-size:8pt;color:#5B6E70;}';
+
+  function downloadWordReport(months, inRange){
+    var bodyHtml = buildKpiReportBodyHTML(months, inRange);
+    var doc = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+      +'<head><meta charset="utf-8"><title>KPI Report</title>'
+      +'<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'
+      +'<style>@page{size:21cm 29.7cm;margin:1.8cm;} '+WORD_REPORT_CSS+'</style></head>'
+      +'<body>'+bodyHtml+'</body></html>';
+    var blob = new Blob(['\ufeff'+doc], { type:'application/msword' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var safeTitle = (kpiReport.title||'KPI_Report').replace(/[^a-z0-9]+/gi,'_').slice(0,60);
+    a.href = url; a.download = safeTitle+'.doc';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  }
+
+  function copyKpiReport(months, inRange){
+    var prio = Object.keys(kpiReport.prioritization).filter(function(k){return kpiReport.prioritization[k];}).join(', ') || '—';
+    var d = KPI_DEFS[kpiReport.kpiId];
+    var lines = [];
+    lines.push('KEY PERFORMANCE INDICATOR REPORT — TCCH/QPS/FRM/011');
+    lines.push('Title:\t'+kpiReport.title);
+    lines.push('Owner:\t'+kpiReport.owner);
+    lines.push('Type:\t'+kpiReport.type);
+    lines.push('Prioritization Criteria:\t'+prio);
+    lines.push('Numerator:\t'+d.numDesc);
+    lines.push('Denominator:\t'+d.denDesc);
+    lines.push('Inclusion Criteria:\t'+kpiReport.inclusion);
+    lines.push('Exclusion Criteria:\t'+kpiReport.exclusion);
+    lines.push('Rationale:\t'+kpiReport.rationale);
+    lines.push('Unit/Department:\t'+kpiReport.unit);
+    lines.push('Sample Size and Sampling Plan:\t'+kpiReport.sampleSize);
+    lines.push('Data Collection:\t'+kpiReport.dataCollection+' — '+kpiReport.tools);
+    lines.push('Reporting:\t'+kpiReport.reporting);
+    lines.push('Benchmark:\t'+kpiReport.benchmark);
+    lines.push('Target:\t'+kpiReport.target);
+    lines.push('Reporting Period:\t'+kpiReport.startMonth+' to '+kpiReport.endMonth);
+    lines.push('');
+    lines.push('Month\t'+months.map(function(mo){return MONTH_ABBR[mo.m-1];}).join('\t'));
+    lines.push('Numerator\t'+months.map(function(mo){return inRange(mo.mk)?mo.num:'';}).join('\t'));
+    lines.push('Denominator\t'+months.map(function(mo){return inRange(mo.mk)?mo.den:'';}).join('\t'));
+    lines.push('Rate (%)\t'+months.map(function(mo){return inRange(mo.mk)&&mo.rate!==null?mo.rate:'';}).join('\t'));
+    lines.push('');
+    lines.push('Analysis and Findings:\t'+kpiReport.analysis);
+    lines.push('');
+    lines.push('Action Plan:');
+    lines.push('Recommended Action\tPerson Responsible\tDeadline\tStatus');
+    kpiReport.actionRows.forEach(function(r){ lines.push([r.action,r.person,r.deadline,r.status].join('\t')); });
+    lines.push('');
+    lines.push('Responsible Person/Department:\t'+kpiReport.responsiblePerson);
+    lines.push('Received by Quality & Patient Safety Office:\t'+kpiReport.receivedBy);
+    var text_ = lines.join('\n');
+    var msgEl = document.getElementById('copyMsg');
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text_).then(function(){ if(msgEl) msgEl.textContent='Copied to clipboard.'; }).catch(function(){ if(msgEl) msgEl.textContent='Copy failed — select and copy manually.'; });
+    } else if(msgEl){ msgEl.textContent='Clipboard not available in this browser.'; }
+  }
+
+  // ================= TOP-LEVEL RENDER =================
+  function renderTopbar(){
+    var row = document.getElementById('topbarRow');
+    row.innerHTML = '';
+    row.appendChild(el('div',{class:'topbar-title'},[ el('span',{class:'eyebrow'},[text('TCCH · Operating Room')]), el('h1',{},[text('Opener Readiness Checklist')]) ]));
+    if(appState.view==='entry'){
+      var gw = el('div',{class:'gauge-wrap'});
+      var svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+      svg.setAttribute('width','46'); svg.setAttribute('height','46'); svg.setAttribute('viewBox','0 0 46 46');
+      var bgc = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      bgc.setAttribute('cx','23'); bgc.setAttribute('cy','23'); bgc.setAttribute('r','19'); bgc.setAttribute('fill','none'); bgc.setAttribute('stroke','rgba(255,255,255,0.15)'); bgc.setAttribute('stroke-width','5');
+      var ring = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      var pct = overallPct(); var circumference = 119.4; var offset = circumference - (circumference*pct/100);
+      ring.setAttribute('cx','23'); ring.setAttribute('cy','23'); ring.setAttribute('r','19'); ring.setAttribute('fill','none');
+      ring.setAttribute('stroke','#8FD3CE'); ring.setAttribute('stroke-width','5'); ring.setAttribute('stroke-linecap','round');
+      ring.setAttribute('stroke-dasharray', String(circumference)); ring.setAttribute('stroke-dashoffset', String(offset));
+      ring.setAttribute('transform','rotate(-90 23 23)');
+      svg.appendChild(bgc); svg.appendChild(ring);
+      var num = el('div',{class:'gauge-num'},[ el('div',{class:'pct'},[text(pct+'%')]), el('div',{class:'lbl'},[text('Ready')]) ]);
+      gw.appendChild(svg); gw.appendChild(num);
+      row.appendChild(gw);
+    } else if(session.user){
+      var ub = el('div',{class:'user-badge'});
+      ub.appendChild(el('div',{class:'who'},[ el('div',{class:'n'},[text(session.user.name)]), el('div',{class:'r'},[text(session.user.role)]) ]));
+      var lo = el('button',{class:'logout-btn'},[text('Logout')]);
+      lo.addEventListener('click', logout);
+      ub.appendChild(lo);
+      row.appendChild(ub);
+    }
+    if(session.user && appState.view!=='login'){
+      // small persistent logout even on entry view
+      if(appState.view==='entry'){
+        var ub2 = el('div',{class:'user-badge', style:'margin-left:12px;'});
+        ub2.appendChild(el('div',{class:'who'},[ el('div',{class:'n'},[text(session.user.name)]), el('div',{class:'r'},[text(session.user.role)]) ]));
+        var lo2 = el('button',{class:'logout-btn'},[text('Logout')]);
+        lo2.addEventListener('click', logout);
+        ub2.appendChild(lo2);
+        row.appendChild(ub2);
+      }
+    }
+  }
+
+  function renderTabs(){
+    var tabs = document.getElementById('tabs');
+    if(appState.view==='login'){ tabs.style.display='none'; return; }
+    tabs.style.display='flex'; tabs.innerHTML='';
+    var role = session.user.role;
+    var available = [{id:'entry', label:'Data Entry'}];
+    if(role==='admin' || role==='superuser') available.push({id:'dashboard', label:'Dashboard'});
+    if(role==='superuser') available.push({id:'admin', label:'Manage'});
+    available.forEach(function(t){
+      var b = el('button',{class:'tab-btn'+(appState.view===t.id?' active':'')},[text(t.label)]);
+      b.addEventListener('click', function(){ appState.view=t.id; renderApp(); });
+      tabs.appendChild(b);
+    });
+  }
+
+  function furthestAllowedIndex(){
+    var pages = currentPages();
+    for(var i=0;i<pages.length-1;i++){ if(!sectionComplete(pages[i])) return i; }
+    return pages.length-1;
+  }
+  function isBlockedByLateGate(){ return appState.view==='entry' && state.late && !state.lateAcknowledged; }
+
+  function renderStepperNav(){
+    var s = document.getElementById('stepper');
+    if(appState.view!=='entry' || isBlockedByLateGate()){ s.style.display='none'; return; }
+    s.style.display='flex'; s.innerHTML='';
+    var maxAllowed = furthestAllowedIndex();
+    var pages = currentPages();
+    var titles = currentPageTitles();
+    pages.forEach(function(p, i){
+      var complete = p!=='review' && sectionComplete(p);
+      var hasFlag = false;
+      var sec = currentSections().filter(function(s2){return s2.id===p;})[0];
+      if(sec) hasFlag = biomedFlags().some(function(f){ return f.section===sec.title; });
+      var locked = i>maxAllowed;
+      var cls = 'step-pill'+(i===current?' active':'')+(complete?' done':'')+(hasFlag?' flag':'')+(locked?' locked':'');
+      var pill = el('div',{class:cls},[el('span',{class:'dot'}), text(titles[p])]);
+      if(locked){ pill.title = 'Complete the sections before this one first.'; }
+      else { pill.addEventListener('click', function(){ current=i; renderApp(); }); }
+      s.appendChild(pill);
+    });
+    var active = s.querySelector('.active'); if(active) active.scrollIntoView({inline:'center', block:'nearest'});
+  }
+
+  function renderBottombar(){
+    var bb = document.getElementById('bottombar');
+    if(appState.view!=='entry' || isBlockedByLateGate()){ bb.style.display='none'; return; }
+    bb.style.display='block';
+    var pages = currentPages();
+    var complete = sectionComplete(pages[current]);
+    var prevBtn = document.getElementById('btnPrev');
+    var nextBtn = document.getElementById('btnNext');
+    prevBtn.disabled = (current===0);
+    if(current===pages.length-1){ nextBtn.style.visibility='hidden'; }
+    else { nextBtn.style.visibility='visible'; nextBtn.disabled = !complete; }
+    document.getElementById('posLabel').innerHTML = 'Section '+(current+1)+' of '+pages.length + (complete? '' : '<span class="hint-incomplete">Complete this section to continue</span>');
+  }
+
+  function renderLateGate(container){
+    var wrap = el('div',{class:'login-wrap'});
+    var box = el('div',{class:'card', style:'border:2px solid var(--danger);background:var(--danger-soft);text-align:center;'});
+    box.appendChild(el('div',{style:'font-size:32px;margin-bottom:6px;'},[text('⚠')]));
+    box.appendChild(el('h2',{style:'color:var(--danger);font-size:18px;margin-bottom:10px;'},[text('Late / Missed Input')]));
+    var msg = state.lateReason==='retrospective'
+      ? 'You\'re filling in a missed checklist for '+state.date+'. This is a retrospective entry.'
+      : 'The OR Opener Readiness Checklist is required between 5:00 AM and 12:00 NN. You are logging this outside that window.';
+    box.appendChild(el('p',{style:'font-size:14px;color:var(--ink);margin-bottom:14px;'},[text(msg)]));
+    box.appendChild(el('p',{style:'font-size:13px;font-weight:700;color:var(--danger);margin-bottom:18px;'},[text('This late entry is recorded and will be included in staff performance evaluation as "Missed Input."')]));
+    var btn = el('button',{class:'submit-btn', style:'background:var(--danger);'},[text('I Understand, Continue')]);
+    btn.addEventListener('click', function(){ state.lateAcknowledged=true; renderApp(); });
+    box.appendChild(btn);
+    wrap.appendChild(box);
+    container.appendChild(wrap);
+  }
+
+  function appendFooter(container){
+    var footer = el('div',{style:'text-align:center;padding:26px 20px 16px 20px;font-size:11.5px;color:var(--ink-faint);'});
+    footer.appendChild(text('Developed by '));
+    var link = el('a',{href:'https://ralpparagili.org', target:'_blank', rel:'noopener noreferrer', style:'color:var(--teal);text-decoration:none;font-weight:600;'},[text('Ralp Paragili')]);
+    footer.appendChild(link);
+    container.appendChild(footer);
+  }
+
+  function renderContent(){
+    var content = document.getElementById('content');
+    content.innerHTML='';
+    if(appState.view==='login'){ renderLogin(content); appendFooter(content); return; }
+    if(appState.view==='dashboard'){ renderDashboard(content); appendFooter(content); return; }
+    if(appState.view==='admin'){ renderAdmin(content); appendFooter(content); return; }
+    // entry view — each step is a single container, so it stays a comfortable centered
+    // width even on a wide screen, rather than stretching edge to edge.
+    if(isBlockedByLateGate()){ renderLateGate(content); appendFooter(content); return; }
+    var entryWrap = el('div',{class:'entry-narrow'});
+    content.appendChild(entryWrap);
+    var pageId = currentPages()[current];
+    if(pageId==='header') renderHeaderPage(entryWrap);
+    else if(pageId==='climate') renderClimatePage(entryWrap);
+    else if(pageId==='gases') renderGasesPage(entryWrap);
+    else if(pageId==='formsprep') renderFormsPrepPage(entryWrap);
+    else if(pageId==='review') renderReviewPage(entryWrap);
+    else { var sec = currentSections().filter(function(s){return s.id===pageId;})[0]; renderCheckPage(entryWrap, sec); }
+    appendFooter(entryWrap);
+  }
+
+  function renderApp(){
+    renderTopbar();
+    renderTabs();
+    renderStepperNav();
+    renderContent();
+    renderBottombar();
+  }
+
+  document.getElementById('btnPrev').addEventListener('click', function(){ if(current>0){ current--; renderApp(); window.scrollTo({top:0,behavior:'smooth'}); } });
+  document.getElementById('btnNext').addEventListener('click', function(){ var pages=currentPages(); if(current<pages.length-1 && sectionComplete(pages[current])){ current++; renderApp(); window.scrollTo({top:0,behavior:'smooth'}); } });
+
+  var BASELINE_SCHEDULE_CSV = `,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,           OPERATING ROOM DUTY SCHEDULE,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,August 2026,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+NAME,S,SU,M,T,W,TH,F,S,SU,M,T,W,TH,F,S,SU,M,T,W,TH,F,S,SU,M,T,W,TH,F,S,SU,M
+,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
+NURSES,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+"PARAGILI, RALP",,,8,8,8,8,8,,,8,8,8,8,8,,,8,8,8,8,8,,,8,8,8,8,8,,,8
+"POLINAR, JAIME",,,"8 - CN
+Float","8 - CN
+Float","8 - CN
+Float","8 - CN
+Float","8 - CN
+Float",,,"8 - CN
+Float","8 - CN
+Float","8 - CN
+Float","8 - CN
+Float","8 - CN
+Float",,,"8 - CN
+Float","8 - CN
+Float","8 - CN
+Float","8 - CN
+Float","8 - CN
+Float",,,"8 - CN
+Float","8 - CN
+Float","8 - CN
+Float","8 - CN
+Float","8 - CN
+Float",,,"8 - CN
+Float"
+"TOLENTINO, MARK",,,"7 - Anes
+CSA","7 - Anes
+CSA","7 - Anes
+CSA","7 - Anes
+CSA","7 - Anes
+CSA",,,"7 - Anes
+CSA","7 - Anes
+CSA","7 - Anes
+CSA","7 - Anes
+CSA","7 - Anes
+CSA",,,"7 - Anes
+CSA","7 - Anes
+CSA","7 - Anes
+CSA","7 - Anes
+CSA","7 - Anes
+CSA",,,"7 - Anes
+CSA","7 - Anes
+CSA","7 - Anes
+CSA","7 - Anes
+CSA","7 - Anes
+CSA",,,"7 - Anes
+CSA"
+"TAN, ARRIANE",,,"9
+PACU","9
+PACU","9
+PACU","9
+PACU","9
+PACU",,,7 - OR2,7 - OR2,7 - OR2,7 - OR2,7 - OR2,,,"8
+OR3","8
+OR3","8
+OR3","8
+OR3","8
+OR3",,,"8
+OR1","8
+OR1","8
+OR1","8
+OR1","8
+OR1",,,"8
+PACU"
+"PEREZ, MELODY",,,"7:30
+OR3","7:30
+OR3","7:30
+OR3","7:30
+OR3","7:30
+OR3",,,"7:30
+OR1","7:30
+OR1","7:30
+OR1","7:30
+OR1","7:30
+OR1",,,"7:30
+OR2","7:30
+OR2","7:30
+OR2","7:30
+OR2","7:30
+OR2",,,"7:30
+OR3","7:30
+OR3","7:30
+OR3","7:30
+OR3","7:30
+OR3",,,"7:30
+OR1"
+"BANTAN, ELMER",,,"8
+OR1","8
+OR1","8
+OR1","8
+OR1","8
+OR1",,,"8
+OR3","8
+OR3","8
+OR3","8
+OR3","8
+OR3",,,"8
+OR2","8
+OR2","8
+OR2","8
+OR2","8
+OR2",,,"8
+OR1","8
+OR1","8
+OR1","8
+OR1","8
+OR1",,,"8
+OR3"
+"LAGAHIT,  CARL",,,"8
+OR2","8
+OR2","8
+OR2","8
+OR2","8
+OR2",,,"8
+OR1","8
+OR1","8
+OR1","8
+OR1","8
+OR1",,,"8
+OR3","8
+OR3","8
+OR3","8
+OR3","8
+OR3",,,"8
+OR2","8
+OR2","8
+OR2","8
+OR2","8
+OR2",,,"8
+OR1"
+"GAURAN, ROGELEN",,,"7 - OR1
+ENC","7 - OR1
+ENC","7 - OR1
+ENC","7 - OR1
+ENC","7 - OR1
+ENC",,,"9
+Float","9
+Float","9
+Float","9
+Float","9
+Float",,,"7 - OR1
+ENC","7 - OR1
+ENC","7 - OR1
+ENC","7 - OR1
+ENC","7 - OR1
+ENC",,,"9
+PACU","9
+PACU","9
+PACU","9
+PACU","9
+PACU",,,"7 - OR1
+ENC"
+"LAYAGUIN, THRESSHA",,,"8
+PACU","8
+PACU","8
+PACU","8
+PACU","8
+PACU",,,"7 - OR1
+ENC","7 - OR1
+ENC","7 - OR1
+ENC","7 - OR1
+ENC","7 - OR1
+ENC",,,"9
+PACU","9
+PACU","9
+PACU","9
+PACU","9
+PACU",,,"8
+OR2","8
+OR2","8
+OR2","8
+OR2","8
+OR2",,,"9
+PACU"
+"OCAMPO, NICOLE",,,"7 - OR2
+ENC","7 - OR2
+ENC","7 - OR2
+ENC","7 - OR2
+ENC","7 - OR2
+ENC",,,"9
+PACU","9
+PACU","9
+PACU","9
+PACU","9
+PACU",,,"9
+Float","9
+Float","9
+Float","9
+Float","9
+Float",,,"9
+Float","9
+Float","9
+Float","9
+Float","9
+Float",,,"7 - OR2
+ENC"
+"MELENDEZ, LUCCANI",,,"7 - OR3
+ENC","7 - OR3
+ENC","7 - OR3
+ENC","7 - OR3
+ENC","7 - OR3
+ENC",,,"9
+PACU","9
+PACU","9
+PACU","9
+PACU","9
+PACU",,,"7 - OR3
+ENC","7 - OR3
+ENC","7 - OR3
+ENC","7 - OR3
+ENC","7 - OR3
+ENC",,,"9
+PACU","9
+PACU","9
+PACU","9
+PACU","9
+PACU",,,"7 - OR3
+ENC"
+"CASTILLO, SOLAYMA",,,"9
+Float","9
+Float","9
+Float","9
+Float","9
+Float",,,"8
+PACU","8
+PACU","8
+PACU","8
+PACU","8
+PACU",,,"9
+PACU","9
+PACU","9
+PACU","9
+PACU","9
+PACU",,,"7 - OR2
+ENC","7 - OR2
+ENC","7 - OR2
+ENC","7 - OR2
+ENC","7 - OR2
+ENC",,,"8
+OR2"
+"CABO, KHRYSTA",,,"8
+OR1","8
+OR1","8
+OR1","8
+OR1","8
+OR1",,,"7 - OR3
+ENC","7 - OR3
+ENC","7 - OR3
+ENC","7 - OR3
+ENC","7 - OR3
+ENC",,,"8
+PACU","8
+PACU","8
+PACU","8
+PACU","8
+PACU",,,"7 - OR3
+ENC","7 - OR3
+ENC","7 - OR3
+ENC","7 - OR3
+ENC","7 - OR3
+ENC",,,"9
+PACU"
+"IDULSA, MARY SUSSIE",,,"8
+PACU","8
+PACU","8
+PACU","8
+PACU","8
+PACU",,,"8
+OR2","8
+OR2","8
+OR2","8
+OR2","8
+OR2",,,7 - OR2,7 - OR2,7 - OR2,7 - OR2,7 - OR2,,,7 - OR1,7 - OR1,7 - OR1,7 - OR1,7 - OR1,,,"9
+Float"
+"SOLIMAN, ALVIN",,,"8
+OR3","8
+OR3","8
+OR3","8
+OR3","8
+OR3",,,"8
+OR2","8
+OR2","8
+OR2","8
+OR2","8
+OR2",,,"8
+OR1","8
+OR1","8
+OR1","8
+OR1","8
+OR1",,,"8
+OR3","8
+OR3","8
+OR3","8
+OR3","8
+OR3",,,"8
+OR2"
+"BRAZIL, RIEDITH",,,"8
+OR2","8
+OR2","8
+OR2","8
+OR2","8
+OR2",,,"9
+Float","9
+Float","9
+Float","9
+Float","9
+Float",,,"9
+Float","9
+Float","9
+Float","9
+Float","9
+Float",,,"8
+PACU","8
+PACU","8
+PACU","8
+PACU","8
+PACU",,,"8
+OR3"
+"CAMBARIJAN, MARIA PAULA",,,"9
+Float","9
+Float","9
+Float","9
+Float","9
+Float",,,"8
+OR3","8
+OR3","8
+OR3","8
+OR3","8
+OR3",,,"8
+OR1","8
+OR1","8
+OR1","8
+OR1","8
+OR1",,,"9
+Float","9
+Float","9
+Float","9
+Float","9
+Float",,,"9
+Float"
+CSSD,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+"MABILANGA, JOSHUA",,,9,9,9,9,9,,,9,9,9,9,9,,8,9,9,9,9,9,,,9,9,9,9,9,,,9
+"CANALES, ANTHONY",,8,7,7,7,7,7,,,7,7,7,7,7,,,7,7,7,7,7,,8,7,7,7,7,7,,,7
+"GUIPAR, JOHN",,,9,9,9,9,9,,8,9,9,9,9,9,,,9,9,9,9,9,,,9,9,9,9,9,,8,9
+SUPPLIES,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+"FERNANDEZ, NEIL",,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+LEGEND,,2ND CALL,,,,ON CALL,,,ANES,- NURSE ANESTHETIST,,,,,,,,,,,,,,,,,,,,,
+,,CODE TEAM,,,CN,- CHARGE NURSE,,,CSA,- CONTROLELED SUBSTANCE AUDITOR,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,ENC,- ENCODER / FIRST TO FINISH FIRST CASE WILL BE THE ENCODER FOR THE DAY,,,,,,,,,,,,,,,,APPROVED BY :     RALP PARAGILI,,,,,APPROVED BY :     ESTER GAURAN,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,FLOAT,- CHARGE NURSE WILL ASSIGN,,,,,,,,,,,,,,,,,,,,,,,,,,,,,`;
+
+  // Seed the app with the OR duty schedule already on file as the baseline dataset,
+  // Try loading real data from Supabase first. Only if the database is genuinely
+  // empty (first run ever) do we seed it from the baseline schedule on file — and
+  // push that seed to Supabase so every device from then on shares the same data.
+  loadFromSupabase().then(function(hadData){
+    if(!hadData){
+      processScheduleCSVText(BASELINE_SCHEDULE_CSV);
+      users.forEach(syncUserUpsert);
+    }
+    refreshAutoAnalysis();
+
+    document.getElementById('updateRefreshBtn').addEventListener('click', function(){
+      window.location.href = location.pathname + '?v=' + Date.now();
+    });
+    document.getElementById('updateDismissBtn').addEventListener('click', function(){
+      updateState.dismissedVersion = updateState.latestVersion;
+      document.getElementById('updateBanner').style.display = 'none';
+      document.body.classList.remove('has-update-banner');
+    });
+    setInterval(checkForUpdate, 5*60*1000);
+    document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') checkForUpdate(); });
+
+    renderApp();
+  });
+})();
+</script>
+</body>
+</html>

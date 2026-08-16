@@ -1,0 +1,41 @@
+name: Keep Supabase Alive
+
+# Pings the Supabase project every 3 days so it never sits idle long enough to
+# trigger the free-tier 7-day inactivity pause — this is exactly the gap that
+# caused the project to go inactive this time. The OR department's longest real
+# closure (December, ~2 weeks) is comfortably covered by a 3-day ping interval.
+#
+# Setup required (one-time, in this repo):
+#   Settings → Secrets and variables → Actions → New repository secret
+#     SUPABASE_URL  = your project's URL (e.g. https://xxxxx.supabase.co)
+#     SUPABASE_KEY  = your project's publishable key (starts with sb_publishable_)
+#
+# Note: GitHub disables scheduled workflows automatically after 60 days with no
+# repository activity at all (commits, etc.) — pushing this file counts as
+# activity, and the workflow running counts as activity too, so once it's set up
+# and running it keeps itself alive. If it ever silently stops firing after a
+# very long period of no other repo activity, re-enable it under the Actions tab.
+
+on:
+  schedule:
+    - cron: '0 3 */3 * *'   # 03:00 UTC, every 3 days
+  workflow_dispatch:          # lets you trigger it manually from the Actions tab too
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase to keep the project active
+        run: |
+          STATUS=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/app_settings?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}")
+          echo "Response status: $STATUS"
+          cat /tmp/response.txt
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]; then
+            echo "✓ Supabase project responded normally — still active."
+          else
+            echo "⚠ Unexpected response — the project may be paused or the secrets may be wrong. Check the Supabase dashboard."
+            exit 1
+          fi

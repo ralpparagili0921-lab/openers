@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PACU — Temperature &amp; Humidity Monitoring</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --fern: #7F9F49;
+    --fern-strong: #5C7A32;
+    --danger: #C4432E;
+    --ink: #2A2A26;
+    color-scheme: light;
+    box-sizing: border-box;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #F2F1ED;
+    color: var(--ink);
+    overscroll-behavior: none;
+  }
+  .screen {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .banner {
+    flex: 0 0 auto;
+    background: linear-gradient(135deg, #E7EFDC, #DCE8D0);
+    padding: 10px 16px 8px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .banner h1 {
+    font-size: 13.5px; font-weight: 700; margin: 0;
+    background: var(--fern); color: #fff;
+    display: inline-block; padding: 6px 14px; border-radius: 999px;
+  }
+  .banner p { font-size: 11px; color: #5a6b3f; margin: 5px 2px 0; }
+
+  .grid {
+    flex: 1 1 auto; min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 8px;
+    padding: 8px;
+  }
+  .box {
+    background: #fff; border-radius: 12px; border: 1.5px solid #eae8e0;
+    padding: 10px 12px;
+    display: flex; flex-direction: column;
+    min-height: 0;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .box.is-abnormal { border-color: var(--danger); background: #FBEAE8; }
+  .box.is-normal { border-color: var(--fern-strong); background: #F0F5E9; }
+
+  .box-title { font-size: 12.5px; font-weight: 800; margin-bottom: 6px; }
+  .box-range { font-size: 10.5px; color: var(--ink); opacity: 0.65; margin-bottom: 8px; }
+
+  .reading-row { display: flex; align-items: center; gap: 8px; }
+  .reading-input {
+    flex: 1 1 auto; min-width: 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px; font-weight: 700; text-align: center;
+    border: 1.5px solid #ddd9cf; border-radius: 10px;
+    padding: 8px 6px;
+    background: #FAF9F6; color: var(--ink); color-scheme: light;
+  }
+  .reading-unit { font-size: 13px; font-weight: 700; color: var(--ink); opacity: 0.6; flex-shrink: 0; }
+
+  .reading-status {
+    margin-top: 8px; font-size: 11.5px; font-weight: 700;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .reading-status .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .box.is-normal .reading-status { color: var(--fern-strong); }
+  .box.is-normal .reading-status .dot { background: var(--fern-strong); }
+  .box.is-abnormal .reading-status { color: var(--danger); }
+  .box.is-abnormal .reading-status .dot { background: var(--danger); }
+
+  .entry-stamp { margin-top: 4px; font-size: 10.5px; font-weight: 700; color: var(--ink); opacity: 0.55; }
+
+  .popup-stamp { margin: 8px 0 0; font-size: 11px; font-weight: 700; opacity: 0.6; color: var(--ink); text-align: center; }
+
+  .chart-wrap { flex: 1 1 auto; min-height: 0; position: relative; }
+  .chart-wrap canvas { max-height: 100%; }
+
+  .popup-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; padding: 24px;
+  }
+  .popup-overlay.show { display: flex; }
+  .popup-box { background: #fff; border-radius: 16px; padding: 20px 18px; max-width: 340px; width: 100%; text-align: left; }
+  .popup-box .icon { font-size: 26px; margin-bottom: 4px; text-align: center; }
+  .popup-box h2 { font-size: 14.5px; margin: 0 0 4px; text-align: center; }
+  .popup-box .reading-preview {
+    font-size: 13px; color: var(--danger); background: #FBEAE8;
+    border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; text-align: center; font-weight: 700;
+  }
+  .popup-box label.section-label { font-size: 12px; font-weight: 700; display: block; margin-bottom: 6px; }
+  .action-option {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 9px; border: 1.5px solid #e5e2d8;
+    margin-bottom: 6px; cursor: pointer; font-size: 12.5px; font-weight: 600;
+  }
+  .action-option input { width: 16px; height: 16px; }
+  .action-option.checked { border-color: var(--fern-strong); background: #F0F5E9; }
+  .popup-box textarea {
+    width: 100%; border-radius: 10px; border: 1px solid #ddd9cf;
+    padding: 8px 10px; font-size: 13px; font-family: inherit;
+    resize: none; background: #fbfaf7; color: var(--ink); color-scheme: light;
+    margin: 8px 0 14px;
+  }
+  .popup-box button {
+    width: 100%;
+    background: var(--fern); color: #fff; border: none;
+    padding: 10px; border-radius: 999px; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .popup-box button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  @media (max-width: 700px) {
+    .grid { grid-template-columns: 1fr; grid-template-rows: repeat(4, auto); overflow-y: auto; }
+    .box { min-height: 200px; }
+  }
+
+  .bottom-sheet {
+    flex: 0 0 auto;
+    padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: #fff;
+    border-top: 1px solid rgba(0,0,0,0.06);
+  }
+  .remarks-label { font-size: 11px; font-weight: 700; display: block; margin-bottom: 5px; }
+  .bottom-sheet textarea {
+    width: 100%; border-radius: 9px; border: 1px solid #ddd9cf;
+    padding: 7px 10px; font-size: 13px; font-family: inherit;
+    resize: none; background: #FAF9F6; color: var(--ink); color-scheme: light;
+  }
+
+  .advance-overlay .popup-box { text-align: center; }
+  .advance-link {
+    display: block; width: 100%;
+    background: var(--fern); color: #fff; border: none; text-decoration: none;
+    padding: 12px 10px; border-radius: 999px; font-weight: 700; font-size: 14.5px;
+    box-sizing: border-box; margin-top: 4px;
+  }
+
+  .opener-topnav {
+    flex: 0 0 auto;
+    display: flex; gap: 8px;
+    padding: 8px 10px calc(4px);
+    background: #1a1a18;
+  }
+  .opener-topnav a {
+    flex: 1; text-align: center; text-decoration: none;
+    font-size: 11px; font-weight: 800; color: #fff;
+    background: rgba(255,255,255,0.12);
+    padding: 7px 10px; border-radius: 999px;
+  }
+  .opener-topnav a.logout-link { background: rgba(196,67,46,0.35); }
+</style>
+</head>
+<body>
+  <div class="screen">
+    <div class="opener-topnav"><a href="index.html?view=dashboard">&larr; Back to Dashboard</a><a class="logout-link" href="index.html">Logout</a></div>
+
+    <div class="banner">
+      <h1>Temperature &amp; Humidity Monitoring</h1>
+      <p>Morning reading · Normal range: 20-24°C, 20-60% humidity</p>
+    </div>
+
+    <div class="grid">
+      <div class="box" id="tempBox">
+        <div class="box-title">Temperature</div>
+        <div class="box-range">Normal: 20°C – 24°C</div>
+        <div class="reading-row">
+          <input type="number" step="0.1" class="reading-input" id="tempInput" placeholder="—">
+          <span class="reading-unit">°C</span>
+        </div>
+        <div class="reading-status" id="tempStatus" style="visibility:hidden;"><span class="dot"></span><span>—</span></div>
+        <div class="entry-stamp" id="tempStamp"></div>
+      </div>
+
+      <div class="box" id="humidityBox">
+        <div class="box-title">Humidity</div>
+        <div class="box-range">Normal: 20% – 60%</div>
+        <div class="reading-row">
+          <input type="number" step="1" class="reading-input" id="humidityInput" placeholder="—">
+          <span class="reading-unit">%</span>
+        </div>
+        <div class="reading-status" id="humidityStatus" style="visibility:hidden;"><span class="dot"></span><span>—</span></div>
+        <div class="entry-stamp" id="humidityStamp"></div>
+      </div>
+
+      <div class="box">
+        <div class="box-title">Temperature — Past 30 Days</div>
+        <div class="chart-wrap"><canvas id="tempChart"></canvas></div>
+      </div>
+
+      <div class="box">
+        <div class="box-title">Humidity — Past 30 Days</div>
+        <div class="chart-wrap"><canvas id="humidityChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="bottom-sheet">
+      <label class="remarks-label" for="generalRemarks">Remarks <span style="font-weight:400;opacity:0.6;">(anything abnormal not covered above — e.g. sensor issue)</span></label>
+      <textarea id="generalRemarks" rows="2" placeholder="Optional"></textarea>
+    </div>
+  </div>
+
+  <div class="popup-overlay" id="popupOverlay">
+    <div class="popup-box">
+      <div class="icon">⚠️</div>
+      <h2 id="popupTitle">Abnormal Reading</h2>
+      <div class="reading-preview" id="popupReadingPreview"></div>
+      <label class="section-label">Immediate Action <span style="font-weight:400;opacity:0.6;">(select all that apply)</span></label>
+      <label class="action-option" id="optHead">
+        <input type="checkbox" value="head"> Informed Department Head
+      </label>
+      <label class="action-option" id="optBiomed">
+        <input type="checkbox" value="biomed"> Informed Biomedical Personnel, Facilities Personnel
+      </label>
+      <label class="action-option" id="optNone">
+        <input type="checkbox" value="none"> No Action Needed
+      </label>
+      <label class="section-label" style="margin-top:6px;">Steps taken (optional)</label>
+      <textarea id="stepsInput" rows="2" placeholder="Describe what was done"></textarea>
+      <button id="popupSubmit" disabled>Submit</button>
+      <p class="popup-stamp" id="popupStamp"></p>
+    </div>
+  </div>
+
+  <div class="popup-overlay advance-overlay" id="advanceOverlay">
+    <div class="popup-box">
+      <div class="icon">✅</div>
+      <h2>Section Complete</h2>
+      <p>Next: Medical Gases Monitoring</p>
+      <a class="advance-link" href="pacu-medical-gases.html" id="advanceLink">Continue to Medical Gases Monitoring →</a>
+    </div>
+  </div>
+
+  <div class="popup-overlay" id="completeOverlay">
+    <div class="popup-box" style="text-align:center;">
+      <div class="icon">✅</div>
+      <h2>Both Readings Recorded</h2>
+      <p style="font-size:13px;color:var(--ink);opacity:0.75;margin:6px 0 16px;">Temperature and humidity are both logged for this morning.</p>
+      <button id="continueBtn" style="background:var(--fern-strong);">Continue →</button>
+      <p class="popup-stamp" id="continueStamp"></p>
+    </div>
+  </div>
+
+<script>
+  // --- Supabase: shared insert helper + global error capture ---
+  var SUPABASE_URL = 'https://jgnweipcjghgdnktpsww.supabase.co';
+  var SUPABASE_ANON_KEY = 'sb_publishable_qIvxyRTzz7Zc6F7wDD8E_g_aj5JAu66';
+  function supabaseInsert(table, row) {
+    return fetch(SUPABASE_URL + '/rest/v1/' + table, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(row)
+    });
+  }
+  function reportError(message, stack, extra) {
+    supabaseInsert('error_reports', {
+      message: String(message || '').slice(0, 2000),
+      stack: String(stack || '').slice(0, 4000),
+      context: (extra || '') + ' @ ' + location.pathname,
+      reported_by: (typeof currentStaff !== 'undefined' && currentStaff) ? currentStaff.name : null,
+      view: location.pathname,
+      occurred_at: new Date().toISOString()
+    }).catch(function(){}); // never let error reporting itself throw
+  }
+  window.addEventListener('error', function(e){
+    reportError(e.message, e.error ? e.error.stack : '', 'window.onerror');
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    var reason = e.reason;
+    reportError(
+      'Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason),
+      reason && reason.stack ? reason.stack : '',
+      'unhandledrejection'
+    );
+  });
+
+  var TEMP_MIN = 20, TEMP_MAX = 24;
+  var HUMIDITY_MIN = 20, HUMIDITY_MAX = 60;
+
+  function isAbnormal(value, min, max){ return value < min || value > max; }
+
+  function formatStamp(d){
+    return d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ', ' +
+           d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+  }
+
+  // ---- fake 30-day history for the charts ----
+  function genHistory(min, max, count, abnormalIndices){
+    var labels = [], data = [];
+    var today = new Date();
+    for (var i = count - 1; i >= 0; i--) {
+      var d = new Date(today); d.setDate(d.getDate() - i);
+      labels.push((d.getMonth()+1) + '/' + d.getDate());
+      var base = min + (max - min) * (0.3 + Math.random() * 0.4);
+      data.push(Math.round(base * 10) / 10);
+    }
+    abnormalIndices.forEach(function(idx){
+      if (idx < data.length) data[idx] = idx % 2 === 0 ? min - 1.5 : max + 1.5;
+    });
+    return { labels: labels, data: data };
+  }
+  var tempHistory = genHistory(TEMP_MIN, TEMP_MAX, 30, [11, 24]);
+  var humidityHistory = genHistory(HUMIDITY_MIN, HUMIDITY_MAX, 30, [7, 19]);
+
+  // custom zone-shading plugin — same approach as CSSD's, avoids pulling in an
+  // extra chartjs-plugin-annotation dependency for something this simple
+  function zoneShadingPlugin(min, max){
+    return {
+      id: 'zoneShading-' + min + '-' + max,
+      beforeDraw: function(chart){
+        var yScale = chart.scales.y;
+        var xScale = chart.scales.x;
+        var ctx = chart.ctx;
+        var top = yScale.getPixelForValue(max);
+        var bottom = yScale.getPixelForValue(min);
+        var chartTop = chart.chartArea.top;
+        var chartBottom = chart.chartArea.bottom;
+        ctx.save();
+        ctx.fillStyle = 'rgba(196, 67, 46, 0.08)';
+        if (top > chartTop) ctx.fillRect(chart.chartArea.left, chartTop, chart.chartArea.width, top - chartTop);
+        if (bottom < chartBottom) ctx.fillRect(chart.chartArea.left, bottom, chart.chartArea.width, chartBottom - bottom);
+        ctx.restore();
+      }
+    };
+  }
+
+  function buildChart(canvasId, history, min, max, label, unit){
+    var ctx = document.getElementById(canvasId).getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: history.labels,
+        datasets: [{
+          label: label,
+          data: history.data,
+          borderColor: '#5C7A32',
+          backgroundColor: 'rgba(127,159,73,0.08)',
+          borderWidth: 2,
+          pointRadius: 2,
+          tension: 0.25,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { maxTicksLimit: 6, font: { size: 9 } }, grid: { display: false } },
+          y: { ticks: { font: { size: 9 }, callback: function(v){ return v + unit; } }, grid: { color: 'rgba(0,0,0,0.05)' } }
+        }
+      },
+      plugins: [zoneShadingPlugin(min, max)]
+    });
+  }
+  buildChart('tempChart', tempHistory, TEMP_MIN, TEMP_MAX, 'Temperature', '°');
+  buildChart('humidityChart', humidityHistory, HUMIDITY_MIN, HUMIDITY_MAX, 'Humidity', '%');
+
+  // ---- reading inputs + abnormal popup ----
+  var pendingReading = null;
+  var tempEntered = false, humidityEntered = false;
+  var completionPopupShown = false;
+
+  function checkCompletion(){
+    if (tempEntered && humidityEntered && !completionPopupShown) {
+      completionPopupShown = true;
+      document.getElementById('completeOverlay').classList.add('show');
+    }
+  }
+
+  function wireReadingInput(inputId, boxId, statusId, stampId, min, max, unit, label, markEntered){
+    var input = document.getElementById(inputId);
+    var box = document.getElementById(boxId);
+    var status = document.getElementById(statusId);
+    var stamp = document.getElementById(stampId);
+    input.addEventListener('change', function(){
+      var val = parseFloat(input.value);
+      if (isNaN(val)) { box.className = 'box'; status.style.visibility = 'hidden'; stamp.textContent = ''; markEntered(false); return; }
+      var abnormal = isAbnormal(val, min, max);
+      box.className = 'box ' + (abnormal ? 'is-abnormal' : 'is-normal');
+      status.style.visibility = 'visible';
+      status.querySelector('span:last-child').textContent = abnormal ? 'Abnormal reading' : 'Normal reading';
+      stamp.textContent = '🕐 Recorded ' + formatStamp(new Date());
+      markEntered(true);
+      if (abnormal) {
+        pendingReading = { label: label, value: val, unit: unit };
+        openAbnormalPopup();
+      } else {
+        checkCompletion();
+      }
+      saveDraft();
+    });
+  }
+  wireReadingInput('tempInput', 'tempBox', 'tempStatus', 'tempStamp', TEMP_MIN, TEMP_MAX, '°C', 'Temperature', function(v){ tempEntered = v; });
+  wireReadingInput('humidityInput', 'humidityBox', 'humidityStatus', 'humidityStamp', HUMIDITY_MIN, HUMIDITY_MAX, '%', 'Humidity', function(v){ humidityEntered = v; });
+
+  // --- draft autosave: local-only, 4-hour expiry. Temp/Humidity keeps most
+  // of its state directly in form fields rather than one JS object, so
+  // restore works by setting .value and re-dispatching 'change' — reusing
+  // the exact same handling the fields already have, rather than
+  // duplicating that logic here ---
+  var DRAFT_KEY = 'pacu_draft_temp-humidity';
+  var DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000;
+  function saveDraft() {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      savedAt: Date.now(),
+      temp: document.getElementById('tempInput').value,
+      humidity: document.getElementById('humidityInput').value,
+      generalRemarks: document.getElementById('generalRemarks').value
+    }));
+  }
+  function tryRestoreDraft() {
+    var raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    try {
+      var draft = JSON.parse(raw);
+      if (Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) { localStorage.removeItem(DRAFT_KEY); return; }
+      if (draft.temp) {
+        document.getElementById('tempInput').value = draft.temp;
+        document.getElementById('tempInput').dispatchEvent(new Event('change'));
+      }
+      if (draft.humidity) {
+        document.getElementById('humidityInput').value = draft.humidity;
+        document.getElementById('humidityInput').dispatchEvent(new Event('change'));
+      }
+      if (draft.generalRemarks) document.getElementById('generalRemarks').value = draft.generalRemarks;
+    } catch (e) { localStorage.removeItem(DRAFT_KEY); }
+  }
+  tryRestoreDraft();
+
+  // general remarks — for anything abnormal that isn't a simple out-of-range
+  // number (a sensor acting up, etc.), same "report a problem" pattern as
+  // the rest of the app, reusing the same popup used for abnormal readings
+  var generalRemarksEl = document.getElementById('generalRemarks');
+  var generalRemarksPopupShown = false;
+  generalRemarksEl.addEventListener('change', function(){
+    var text = generalRemarksEl.value.trim();
+    saveDraft();
+    if (text.length === 0) { generalRemarksPopupShown = false; return; }
+    if (generalRemarksPopupShown) return;
+    generalRemarksPopupShown = true;
+    pendingReading = { label: 'General Remarks', value: text, unit: '' };
+    openAbnormalPopup();
+  });
+
+  document.getElementById('continueBtn').addEventListener('click', function(){
+    document.getElementById('continueStamp').textContent = '🕐 Confirmed ' + formatStamp(new Date());
+    document.getElementById('completeOverlay').classList.remove('show');
+    document.getElementById('advanceOverlay').classList.add('show');
+  });
+
+  var popupEl = document.getElementById('popupOverlay');
+  var checkboxes = [document.getElementById('optHead'), document.getElementById('optBiomed'), document.getElementById('optNone')];
+  var submitBtn = document.getElementById('popupSubmit');
+
+  function openAbnormalPopup(){
+    var isNumeric = pendingReading.unit !== '';
+    document.getElementById('popupReadingPreview').textContent = isNumeric
+      ? pendingReading.label + ': ' + pendingReading.value + pendingReading.unit + ' — outside normal range'
+      : pendingReading.label + ': ' + pendingReading.value;
+    checkboxes.forEach(function(opt){ opt.querySelector('input').checked = false; opt.classList.remove('checked'); });
+    document.getElementById('stepsInput').value = '';
+    updateSubmitState();
+    popupEl.classList.add('show');
+  }
+  function updateSubmitState(){
+    var anyChecked = checkboxes.some(function(opt){ return opt.querySelector('input').checked; });
+    submitBtn.disabled = !anyChecked;
+  }
+  checkboxes.forEach(function(opt){
+    opt.addEventListener('click', function(){
+      var cb = opt.querySelector('input');
+      opt.classList.toggle('checked', cb.checked);
+      updateSubmitState();
+    });
+  });
+  submitBtn.addEventListener('click', function(){
+    if (submitBtn.disabled) return;
+    document.getElementById('popupStamp').textContent = '🕐 Confirmed ' + formatStamp(new Date());
+    popupEl.classList.remove('show');
+    checkCompletion();
+  });
+</script>
+
+</body>
+</html>

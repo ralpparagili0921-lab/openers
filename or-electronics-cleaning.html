@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Electronics Cleaning — Prototype</title>
+<style>
+  :root {
+    --fern: #7F9F49;
+    --fern-strong: #5C7A32;
+    --danger: #C4432E;
+    --ink: #2A2A26;
+    color-scheme: light;
+    box-sizing: border-box;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #F2F1ED;
+    color: var(--ink);
+    overscroll-behavior: none;
+  }
+  .screen {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .banner {
+    flex: 0 0 auto;
+    background: linear-gradient(135deg, #E7EFDC, #DCE8D0);
+    padding: 8px 16px 7px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .banner h1 {
+    font-size: 13px; font-weight: 700; margin: 0;
+    background: var(--fern); color: #fff;
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+  }
+
+  .instruction-strip {
+    flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    background: #fff;
+    padding: 8px 14px;
+    font-size: 15px; font-weight: 800; color: var(--ink);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .instruction-strip .step { display: flex; align-items: center; gap: 6px; }
+  .instruction-strip .dot { width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0; }
+  .instruction-strip .dot.off { background: #d8d6cf; }
+  .instruction-strip .dot.flag { background: var(--danger); }
+  .instruction-strip .arrow { opacity: 0.4; font-size: 14px; }
+
+  .item-list {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    padding: 5px 6px;
+    gap: 5px;
+    min-height: 0;
+  }
+  .item-card {
+    display: flex;
+    background: #fff;
+    border-radius: 12px;
+    padding: 5px;
+    min-height: 0;
+    border: 1.5px solid #eae8e0;
+    transition: border-color 0.2s, background 0.2s;
+    overflow: hidden;
+    gap: 5px;
+  }
+  .item-card.is-flag { border-color: var(--danger); background: #FBEAE8; }
+  .item-card.is-done { border-color: var(--fern-strong); background: #DCE8D0; }
+
+  /* image — full card height, left column */
+  .item-image {
+    flex: 1 1 38%; min-width: 0;
+    border-radius: 9px;
+    background: #EDEBE4;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+    overflow: hidden;
+  }
+  .item-image img { width: 82%; height: 82%; object-fit: contain; }
+  .item-card.is-done .item-image { background: #C9DDB4; }
+  .item-card.is-flag .item-image { background: #F3D7D3; }
+
+  /* right column — Toggles section (top, grows) + Remarks section (bottom, fixed) */
+  .right-col {
+    flex: 1 1 62%; min-width: 0;
+    display: flex; flex-direction: column;
+    gap: 5px;
+  }
+
+  /* tablet portrait and phones: stack the 4 boxes into a single column instead
+     of a 2x2 grid, and allow the page to scroll — each card keeps its normal
+     side-by-side image/toggles layout, it just gets its own natural height
+     instead of being squeezed to fit a quarter of the screen with no scroll */
+  @media (max-width: 820px) {
+    .item-list {
+      grid-template-columns: 1fr;
+      grid-template-rows: none;
+      overflow-y: auto;
+    }
+    .item-card {
+      min-height: auto;
+      overflow: visible;
+    }
+    .item-image { min-height: 180px; }
+  }
+  .toggles-section {
+    flex: 0 0 auto; min-height: 0;
+    display: flex; flex-direction: column;
+    gap: 3px;
+  }
+  .item-name {
+    font-size: 24px; font-weight: 900; line-height: 1.0;
+    letter-spacing: -0.015em;
+    margin-bottom: 3px;
+  }
+
+  .sub-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,255,255,0.65); border-radius: 11px; padding: 9px 14px;
+    font-size: 20px; font-weight: 800; color: var(--ink);
+    flex-shrink: 0;
+    margin-bottom: 3px;
+  }
+  .item-card.is-done .sub-toggle, .item-card.is-flag .sub-toggle { background: rgba(255,255,255,0.8); }
+  .sub-toggle .label-col { display: flex; flex-direction: column; gap: 1px; }
+  .sub-toggle .sub-caption { font-size: 11px; font-weight: 600; opacity: 0.6; }
+  .sub-toggle .mini-switch {
+    width: 63px; height: 38px; border-radius: 999px; border: none; cursor: pointer;
+    background: #d8d6cf; position: relative; padding: 0; flex-shrink: 0;
+  }
+  .sub-toggle .mini-switch::after {
+    content: ''; position: absolute; top: 4px; left: 4px;
+    width: 30px; height: 30px; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    transition: left 0.4s ease;
+  }
+  .sub-toggle .mini-switch.on { background: var(--fern-strong); }
+  .sub-toggle .mini-switch.on::after { left: calc(100% - 34px); }
+  .sub-toggle.is-locked { background: #F3D7D3; }
+  .sub-toggle .mini-switch.locked { background: var(--danger); opacity: 0.55; cursor: not-allowed; }
+  .sub-toggle .mini-switch.locked::after { left: calc(100% - 34px); }
+  .sub-toggle.is-gated { opacity: 0.6; }
+  .sub-toggle .mini-switch.gated { background: #c9c7bd; cursor: not-allowed; }
+  .clean-warning {
+    font-size: 10.5px; font-weight: 700; color: var(--danger);
+    padding: 2px 2px 3px;
+  }
+
+  @keyframes cardGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(127,159,73,0.4); }
+    50% { box-shadow: 0 0 0 5px rgba(127,159,73,0); }
+  }
+  .item-card.is-pending .clean-toggle-row .mini-switch { animation: cardGlow 1.6s ease-in-out infinite; }
+
+  .remarks-section { flex: 0 0 auto; }
+  .remarks-line {
+    width: 100%; border-radius: 7px; border: 1px solid #e5e2d8;
+    padding: 9px 8px; font-size: 10.5px; font-family: inherit;
+    min-height: 44px; resize: none;
+    background: #FAF9F6; color: var(--ink); color-scheme: light;
+  }
+  .remarks-line::placeholder { color: #ada99e; font-size: 10px; }
+  .item-card.is-flag .remarks-line { background: #fff; border-color: var(--danger); }
+
+  .bottom-sheet {
+    flex: 0 0 auto;
+    padding: 8px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: #fff;
+    border-top: 1px solid rgba(0,0,0,0.06);
+  }
+  .progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .progress-track { flex: 1; height: 6px; background: #EDEBE4; border-radius: 999px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--fern); width: 0%; transition: width 0.25s; }
+  .progress-text { font-size: 11px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+
+  .continue-btn {
+    display: none; width: 100%; align-items: center; justify-content: center; gap: 5px;
+    background: var(--fern); color: #fff;
+    padding: 9px; border-radius: 999px;
+    font-size: 13px; font-weight: 700; border: none; cursor: pointer;
+    animation: continuePulse 1.6s ease-in-out infinite;
+  }
+  @keyframes continuePulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(127,159,73,0.5); }
+    50% { box-shadow: 0 0 0 6px rgba(127,159,73,0); }
+  }
+
+  .popup-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; padding: 24px;
+  }
+  .popup-overlay.show { display: flex; }
+  .popup-box { background: #fff; border-radius: 16px; padding: 20px 18px; max-width: 320px; width: 100%; text-align: left; }
+  .popup-box .icon { font-size: 26px; margin-bottom: 4px; text-align: center; }
+  .popup-box h2 { font-size: 14.5px; margin: 0 0 4px; text-align: center; }
+  .popup-box .err-preview {
+    font-size: 12px; color: var(--danger); background: #FBEAE8;
+    border-radius: 8px; padding: 6px 10px; margin-bottom: 10px;
+  }
+  .popup-box label { font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; }
+  .popup-box textarea {
+    width: 100%; border-radius: 10px; border: 1px solid #ddd9cf;
+    padding: 8px 10px; font-size: 13px; font-family: inherit;
+    resize: none; background: #fbfaf7; color: var(--ink); color-scheme: light;
+    margin-bottom: 14px;
+  }
+  .popup-box button {
+    width: 100%;
+    background: var(--fern); color: #fff; border: none;
+    padding: 10px; border-radius: 999px; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+
+  .placeholder-note {
+    position: fixed; top: 4px; right: 6px;
+    font-size: 8px; color: #b5b3aa; font-weight: 600;
+    letter-spacing: 0.02em; text-transform: uppercase;
+    z-index: 50;
+  }
+
+  .advance-overlay .popup-box { text-align: center; }
+  .advance-link {
+    display: block; width: 100%;
+    background: var(--fern); color: #fff; border: none; text-decoration: none;
+    padding: 12px 10px; border-radius: 999px; font-weight: 700; font-size: 14.5px;
+    box-sizing: border-box; margin-top: 4px;
+  }
+
+  .opener-topnav {
+    flex: 0 0 auto;
+    display: flex; gap: 8px;
+    padding: 8px 10px calc(4px);
+    background: #1a1a18;
+  }
+  .opener-topnav a {
+    flex: 1; text-align: center; text-decoration: none;
+    font-size: 11px; font-weight: 800; color: #fff;
+    background: rgba(255,255,255,0.12);
+    padding: 7px 10px; border-radius: 999px;
+  }
+  .opener-topnav a.logout-link { background: rgba(196,67,46,0.35); }
+</style>
+</head>
+<body>
+  <div class="screen">
+    <div class="opener-topnav"><a href="index.html?view=dashboard">&larr; Back to Dashboard</a><a class="logout-link" href="index.html">Logout</a></div>
+
+
+    <div class="banner"><h1>Surface Cleaning for Electronics</h1></div>
+
+    <div class="instruction-strip">
+      <span class="step"><span class="dot off"></span>Flip = clean</span>
+      <span class="arrow">›</span>
+      <span class="step"><span class="dot flag"></span>Write a note = reports the problem</span>
+    </div>
+
+    <div class="item-list" id="itemList"></div>
+
+    <div class="bottom-sheet">
+      <div class="progress-row">
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <span class="progress-text" id="progressText">0 / 4</span>
+      </div>
+      <button class="continue-btn" id="continueBtn">Continue →</button>
+    </div>
+  </div>
+
+  <div class="popup-overlay" id="popupOverlay">
+    <div class="popup-box">
+      <div class="icon">⚠️</div>
+      <h2 id="popupTitle">Problem reported</h2>
+      <div class="err-preview" id="popupErrPreview"></div>
+      <label for="actionsInput">Actions taken</label>
+      <textarea id="actionsInput" rows="3" placeholder="What was done in response?"></textarea>
+      <button id="popupSubmit">Submit</button>
+    </div>
+  </div>
+
+  <div class="popup-overlay advance-overlay" id="advanceOverlay">
+    <div class="popup-box">
+      <div class="icon">✅</div>
+      <h2>Section Complete</h2>
+      <p>Next: Anesthesia Machine</p>
+      <a class="advance-link" href="or-anesthesia-machine.html">Continue to Anesthesia Machine →</a>
+    </div>
+  </div>
+
+<script>
+  // --- Supabase: shared insert helper + global error capture ---
+  var SUPABASE_URL = 'https://jgnweipcjghgdnktpsww.supabase.co';
+  var SUPABASE_ANON_KEY = 'sb_publishable_qIvxyRTzz7Zc6F7wDD8E_g_aj5JAu66';
+  function supabaseInsert(table, row) {
+    return fetch(SUPABASE_URL + '/rest/v1/' + table, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(row)
+    });
+  }
+  function reportError(message, stack, extra) {
+    supabaseInsert('error_reports', {
+      message: String(message || '').slice(0, 2000),
+      stack: String(stack || '').slice(0, 4000),
+      context: (extra || '') + ' @ ' + location.pathname,
+      reported_by: (typeof currentStaff !== 'undefined' && currentStaff) ? currentStaff.name : null,
+      view: location.pathname,
+      occurred_at: new Date().toISOString()
+    }).catch(function(){}); // never let error reporting itself throw
+  }
+  window.addEventListener('error', function(e){
+    reportError(e.message, e.error ? e.error.stack : '', 'window.onerror');
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    var reason = e.reason;
+    reportError(
+      'Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason),
+      reason && reason.stack ? reason.stack : '',
+      'unhandledrejection'
+    );
+  });
+
+  var IMAGE_URLS = {
+    cautery: 'images/cautery.png',
+    suction: 'images/suction.png',
+    warmer: 'images/warmer.png',
+    tourniquet: 'images/tourniquet.png'
+  };
+  var REMARKS_PLACEHOLDER = 'What\'s wrong? (e.g. won\'t power on)';
+
+  var items = [
+    { id: 'cautery', label: 'Cautery', subToggles: [{ key: 'turnOn', label: 'Turn on' }, { key: 'groundingPad', label: 'Grounding pad' }] },
+    { id: 'suction', label: 'Suction', subToggles: [{ key: 'turnOn', label: 'Turn on' }, { key: 'bottle', label: 'Bottle' }, { key: 'tube', label: 'Tube + ext.' }] },
+    { id: 'warmer', label: 'Warmer', subToggles: [{ key: 'turnOn', label: 'Turn on' }] },
+    { id: 'tourniquet', label: 'Tourniquet', subToggles: [{ key: 'turnOn', label: 'Turn on' }, { key: 'cuff', label: 'Cuff / leaks' }] }
+  ];
+  var state = {};
+  items.forEach(function(it){
+    var subs = {};
+    it.subToggles.forEach(function(s){ subs[s.key] = false; });
+    state[it.id] = { status: 'pending', remarks: '', actionsTaken: '', subs: subs, popupShown: false };
+  });
+
+  // --- draft autosave: local-only, 4-hour expiry ---
+  var DRAFT_KEY = 'opener_draft_electronics-cleaning';
+  var DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000;
+  function saveDraft() { localStorage.setItem(DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), state: state })); }
+  function tryRestoreDraft() {
+    var raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    try {
+      var draft = JSON.parse(raw);
+      if (Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) { localStorage.removeItem(DRAFT_KEY); return; }
+      Object.keys(draft.state).forEach(function(id){ if (state[id]) Object.assign(state[id], draft.state[id]); });
+    } catch (e) { localStorage.removeItem(DRAFT_KEY); }
+  }
+  tryRestoreDraft();
+
+  var listEl = document.getElementById('itemList');
+
+  // Drives the box's color only — green means "this machine is powered on,"
+  // nothing to do with cleaning or the other checks. Kept deliberately separate
+  // from isFullyResolved below, which drives progress/Continue and does need
+  // every toggle, not just this one.
+  function statusFor(it) {
+    var st = state[it.id];
+    if (st.remarks.trim().length > 0) return 'flag';
+    if (st.subs.turnOn) return 'done';
+    return 'pending';
+  }
+
+  function render() {
+    listEl.innerHTML = '';
+    items.forEach(function(it){
+      var st = state[it.id];
+      var status = statusFor(it);
+      var card = document.createElement('div');
+      card.className = 'item-card is-' + status;
+
+      var img = document.createElement('div');
+      img.className = 'item-image';
+      var imgEl = document.createElement('img');
+      imgEl.src = IMAGE_URLS[it.id];
+      imgEl.alt = it.label;
+      img.appendChild(imgEl);
+      card.appendChild(img);
+
+      var rightCol = document.createElement('div');
+      rightCol.className = 'right-col';
+
+      var togglesSection = document.createElement('div');
+      togglesSection.className = 'toggles-section';
+
+      var name = document.createElement('div');
+      name.className = 'item-name';
+      name.textContent = it.label;
+      togglesSection.appendChild(name);
+
+      // Cleaned / Not Cleaned — same size and style as the sub-toggles, listed first
+      var cleanRow = document.createElement('div');
+      cleanRow.className = 'sub-toggle clean-toggle-row' + (status === 'flag' ? ' is-locked' : '');
+      cleanRow.innerHTML = '<span class="label-col"><span>Cleaned</span><span class="sub-caption">Using disinfectant wipes</span></span>';
+      var cleanSw = document.createElement('button');
+      cleanSw.className = 'mini-switch' + (st.status === 'done' ? ' on' : '') + (status === 'flag' ? ' locked' : '');
+      cleanSw.setAttribute('aria-label', 'Toggle cleaned: ' + it.label);
+      if (status === 'flag') {
+        cleanSw.disabled = true;
+      } else {
+        cleanSw.onclick = function(e){
+          e.stopPropagation();
+          st.status = st.status === 'done' ? 'pending' : 'done';
+          render();
+        };
+      }
+      cleanRow.appendChild(cleanSw);
+      togglesSection.appendChild(cleanRow);
+
+      if (st.status !== 'done') {
+        var warning = document.createElement('div');
+        warning.className = 'clean-warning';
+        warning.textContent = '⚠ Clean before turning on';
+        togglesSection.appendChild(warning);
+      }
+
+      it.subToggles.forEach(function(s){
+        var subRow = document.createElement('div');
+        var isTurnOn = s.key === 'turnOn';
+        var lockedByCleaning = isTurnOn && st.status !== 'done';
+        subRow.className = 'sub-toggle' + (lockedByCleaning ? ' is-gated' : '');
+        subRow.innerHTML = '<span>' + s.label + '</span>';
+        var miniSw = document.createElement('button');
+        miniSw.className = 'mini-switch' + (st.subs[s.key] ? ' on' : '') + (lockedByCleaning ? ' gated' : '');
+        miniSw.setAttribute('aria-label', 'Toggle ' + s.label);
+        if (lockedByCleaning) {
+          miniSw.disabled = true;
+        } else {
+          miniSw.onclick = function(e){
+            e.stopPropagation();
+            st.subs[s.key] = !st.subs[s.key];
+            render();
+          };
+        }
+        subRow.appendChild(miniSw);
+        togglesSection.appendChild(subRow);
+      });
+
+      rightCol.appendChild(togglesSection);
+
+      var remarksSection = document.createElement('div');
+      remarksSection.className = 'remarks-section';
+      var remarks = document.createElement('textarea');
+      remarks.rows = 3;
+      remarks.className = 'remarks-line';
+      remarks.placeholder = REMARKS_PLACEHOLDER;
+      remarks.value = st.remarks;
+      remarks.addEventListener('input', function(e){ st.remarks = e.target.value; });
+      remarks.addEventListener('blur', function(){
+        if (st.remarks.trim().length > 0 && !st.popupShown) {
+          st.popupShown = true;
+          openActionsPopup(it, st);
+        } else if (st.remarks.trim().length === 0) {
+          st.popupShown = false;
+        }
+        render();
+      });
+      remarksSection.appendChild(remarks);
+      rightCol.appendChild(remarksSection);
+
+      card.appendChild(rightCol);
+      listEl.appendChild(card);
+    });
+    updateProgress();
+  }
+
+  // Drives progress/Continue — genuinely needs everything: Cleaned toggle,
+  // every sub-toggle including Turn On, or a flagged problem as the alternative.
+  function isFullyResolved(it) {
+    var st = state[it.id];
+    if (st.remarks.trim().length > 0) return true;
+    var allSubsOn = it.subToggles.every(function(s){ return st.subs[s.key]; });
+    return st.status === 'done' && allSubsOn;
+  }
+  function updateProgress() {
+    var resolved = items.filter(isFullyResolved).length;
+    document.getElementById('progressFill').style.width = (resolved / items.length * 100) + '%';
+    document.getElementById('progressText').textContent = resolved + ' / ' + items.length;
+    document.getElementById('continueBtn').style.display = resolved === items.length ? 'flex' : 'none';
+    saveDraft();
+  }
+
+  var popupEl = document.getElementById('popupOverlay');
+  var currentPopupItem = null;
+  function openActionsPopup(it, st) {
+    currentPopupItem = it;
+    document.getElementById('popupTitle').textContent = it.label + ' — problem reported';
+    document.getElementById('popupErrPreview').textContent = st.remarks;
+    document.getElementById('actionsInput').value = st.actionsTaken || '';
+    popupEl.classList.add('show');
+  }
+  document.getElementById('popupSubmit').addEventListener('click', function(){
+    if (currentPopupItem) {
+      state[currentPopupItem.id].actionsTaken = document.getElementById('actionsInput').value;
+    }
+    popupEl.classList.remove('show');
+    currentPopupItem = null;
+  });
+
+  document.getElementById('continueBtn').addEventListener('click', function(){
+    document.getElementById('advanceOverlay').classList.add('show');
+  });
+
+  render();
+</script>
+</body>
+</html>

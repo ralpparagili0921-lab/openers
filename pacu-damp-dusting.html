@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PACU — Surface Cleaning (Damp Dusting)</title>
+<style>
+  :root {
+    --fern: #7F9F49;
+    --fern-strong: #5C7A32;
+    --danger: #C4432E;
+    --slate: #6E6D69;
+    --ink: #2A2A26;
+    color-scheme: light;
+    box-sizing: border-box;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #F2F1ED;
+    color: var(--ink);
+    overscroll-behavior: none;
+  }
+  .screen {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .opener-topnav {
+    flex: 0 0 auto;
+    display: flex; gap: 8px;
+    padding: 8px 10px 4px;
+    background: #1a1a18;
+  }
+  .opener-topnav a {
+    flex: 1; text-align: center; text-decoration: none;
+    font-size: 11px; font-weight: 800; color: #fff;
+    background: rgba(255,255,255,0.12);
+    padding: 7px 10px; border-radius: 999px;
+  }
+  .opener-topnav a.logout-link { background: rgba(196,67,46,0.35); }
+
+  .banner {
+    flex: 0 0 auto;
+    background: linear-gradient(135deg, #E7EFDC, #DCE8D0);
+    padding: 10px 16px 10px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .banner h1 {
+    font-size: 14px; font-weight: 700; margin: 0 0 6px;
+    background: var(--fern); color: #fff;
+    display: inline-block; padding: 6px 14px; border-radius: 999px;
+  }
+  .dilution-caption {
+    font-size: 11.5px; font-weight: 700; color: var(--fern-strong);
+    background: rgba(255,255,255,0.6); display: inline-block;
+    padding: 4px 10px; border-radius: 999px;
+  }
+
+  .toggles-pane {
+    flex: 1 1 auto; min-width: 0;
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+    padding: 16px 20px;
+  }
+  /* margin:auto centers this block vertically ONLY when it's shorter than
+     the pane — when content is taller (and needs to scroll), it falls back
+     to normal top-aligned scrolling instead of clipping the top, which is
+     what justify-content:center on the parent would do instead */
+  /* always a single column for this section — with only 1-2 items per
+     group, a wide multi-column grid left each column feeling sparse and
+     forced rows into a cramped stacked-button layout. Scrolls naturally
+     on tablet portrait and smaller, same as the rest of the app. */
+  .toggles-inner {
+    margin: auto;
+    max-width: 760px; width: 100%;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .group-column { display: contents; }
+
+  .group-label {
+    font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--slate); opacity: 0.8;
+    margin: 14px 2px 2px;
+  }
+  .group-label:first-child { margin-top: 0; }
+
+  /* Fluid sizing instead of a hard breakpoint jump — font-size scales
+     continuously with viewport width between a 360px phone and an 820px
+     tablet, so every screen in between gets a proportionate size rather
+     than either the full desktop size or a single fixed "small" size.
+     Padding is in em, so it scales automatically with the font-size. */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #fff; border: 1.5px solid #eae8e0; border-radius: 16px;
+    padding: 1em 1.2em; gap: 0.5em;
+    font-size: clamp(16px, 0.87vw + 12.9px, 20px); font-weight: 800; color: var(--ink);
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .toggle-row.is-done { border-color: var(--fern-strong); background: #DCE8D0; }
+  .toggle-row.is-na { border-color: #c9c7bd; background: #EDEBE4; }
+  .toggle-row.is-flag { border-color: var(--danger); background: #FBEAE8; }
+
+  .pf-buttons { display: flex; gap: 0.5em; flex-shrink: 0; }
+  .pf-btn {
+    border: 1.5px solid #d8d6cf; background: #fff; border-radius: 999px;
+    padding: 0.7em 1.3em; font-size: clamp(13px, 0.44vw + 11.4px, 15px); font-weight: 800; color: var(--ink);
+    cursor: pointer; text-align: center;
+  }
+  /* below the fluid range's floor, shrinking the font further would make
+     touch targets uncomfortably small — stack instead of cramming smaller */
+  @media (max-width: 370px) {
+    .toggle-row { flex-direction: column; align-items: stretch; }
+    .pf-buttons { justify-content: stretch; }
+    .pf-btn { flex: 1; }
+  }
+  .pf-btn.selected.done { background: var(--fern-strong); border-color: var(--fern-strong); color: #fff; }
+  .pf-btn.selected.na { background: #8a8780; border-color: #8a8780; color: #fff; }
+  .pf-btn.selected.biomed { background: var(--danger); border-color: var(--danger); color: #fff; }
+  @keyframes rowGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(127,159,73,0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(127,159,73,0); }
+  }
+  .toggle-row.is-pending .pf-btn { animation: rowGlow 1.6s ease-in-out infinite; }
+
+  .bottom-sheet {
+    flex: 0 0 auto;
+    padding: 8px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: #fff;
+    border-top: 1px solid rgba(0,0,0,0.06);
+  }
+  .progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .progress-track { flex: 1; height: 6px; background: #EDEBE4; border-radius: 999px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--fern); width: 0%; transition: width 0.25s; }
+  .progress-text { font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+
+  .continue-btn {
+    display: none; width: 100%; align-items: center; justify-content: center; gap: 5px;
+    background: var(--fern); color: #fff;
+    padding: 10px; border-radius: 999px;
+    font-size: 14px; font-weight: 700; border: none; cursor: pointer;
+    animation: continuePulse 1.6s ease-in-out infinite;
+  }
+  @keyframes continuePulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(127,159,73,0.5); }
+    50% { box-shadow: 0 0 0 6px rgba(127,159,73,0); }
+  }
+
+  .popup-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; padding: 24px;
+  }
+  .popup-overlay.show { display: flex; }
+  .popup-box { background: #fff; border-radius: 16px; padding: 20px 18px; max-width: 320px; width: 100%; text-align: left; }
+  .popup-box .icon { font-size: 26px; margin-bottom: 4px; text-align: center; }
+  .popup-box h2 { font-size: 14.5px; margin: 0 0 4px; text-align: center; }
+  .popup-box p { font-size: 12.5px; text-align: center; margin: 0 0 10px; }
+  .popup-box label { font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; }
+  .popup-box textarea {
+    width: 100%; border-radius: 10px; border: 1px solid #ddd9cf;
+    padding: 8px 10px; font-size: 13px; font-family: inherit;
+    resize: none; background: #fbfaf7; color: var(--ink); color-scheme: light;
+    margin-bottom: 14px;
+  }
+  .popup-box button {
+    width: 100%;
+    background: var(--danger); color: #fff; border: none;
+    padding: 10px; border-radius: 999px; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .advance-overlay .popup-box { text-align: center; }
+  .advance-link {
+    display: block; width: 100%;
+    background: var(--fern); color: #fff; border: none; text-decoration: none;
+    padding: 12px 10px; border-radius: 999px; font-weight: 700; font-size: 14.5px;
+    box-sizing: border-box; margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+  <div class="screen">
+    <div class="opener-topnav">
+      <a href="index.html?view=dashboard">&larr; Back to Dashboard</a>
+      <a class="logout-link" href="index.html">Logout</a>
+    </div>
+    <div class="banner">
+      <h1>Surface Cleaning — Damp Dusting</h1><br>
+      <span class="dilution-caption">🧪 5L of Water to 4 tablets Presept</span>
+    </div>
+
+    <div class="toggles-pane"><div class="toggles-inner" id="togglesPane"></div></div>
+
+    <div class="bottom-sheet">
+      <div class="progress-row">
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <span class="progress-text" id="progressText">0 / 8</span>
+      </div>
+      <button class="continue-btn" id="continueBtn">Continue →</button>
+    </div>
+  </div>
+
+  <div class="popup-overlay" id="biomedPopupOverlay">
+    <div class="popup-box">
+      <div class="icon">🛠️</div>
+      <h2 id="biomedPopupTitle">Sent to BioMed</h2>
+      <label for="biomedActionsInput">Actions taken</label>
+      <textarea id="biomedActionsInput" rows="3" placeholder="What was the issue, and what was done?"></textarea>
+      <button id="biomedPopupSubmit">Submit — this will be recorded</button>
+    </div>
+  </div>
+
+  <div class="popup-overlay advance-overlay" id="advanceOverlay">
+    <div class="popup-box">
+      <div class="icon">✅</div>
+      <h2>Section Complete</h2>
+      <p>Next: Cardiac Monitor</p>
+      <a class="advance-link" href="pacu-cardiac-monitor.html" id="advanceLink">Continue to Cardiac Monitor →</a>
+    </div>
+  </div>
+
+<script>
+  // --- Supabase: shared insert helper + global error capture ---
+  var SUPABASE_URL = 'https://jgnweipcjghgdnktpsww.supabase.co';
+  var SUPABASE_ANON_KEY = 'sb_publishable_qIvxyRTzz7Zc6F7wDD8E_g_aj5JAu66';
+  function supabaseInsert(table, row) {
+    return fetch(SUPABASE_URL + '/rest/v1/' + table, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(row)
+    });
+  }
+  function reportError(message, stack, extra) {
+    supabaseInsert('error_reports', {
+      message: String(message || '').slice(0, 2000),
+      stack: String(stack || '').slice(0, 4000),
+      context: (extra || '') + ' @ ' + location.pathname,
+      reported_by: (typeof currentStaff !== 'undefined' && currentStaff) ? currentStaff.name : null,
+      view: location.pathname,
+      occurred_at: new Date().toISOString()
+    }).catch(function(){}); // never let error reporting itself throw
+  }
+  window.addEventListener('error', function(e){
+    reportError(e.message, e.error ? e.error.stack : '', 'window.onerror');
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    var reason = e.reason;
+    reportError(
+      'Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason),
+      reason && reason.stack ? reason.stack : '',
+      'unhandledrejection'
+    );
+  });
+
+  // Stretcher and Bedside Table are per-patient — one of each per bed slot.
+  // Station Table and Cabinets are shared PACU furniture, not tied to a bed.
+  var items = [
+    { id: 'stretcher1', label: 'Stretcher', group: 'Bed 1' },
+    { id: 'bedsideTable1', label: 'Bedside Table', group: 'Bed 1' },
+    { id: 'stretcher2', label: 'Stretcher', group: 'Bed 2' },
+    { id: 'bedsideTable2', label: 'Bedside Table', group: 'Bed 2' },
+    { id: 'stretcher3', label: 'Stretcher', group: 'Bed 3' },
+    { id: 'bedsideTable3', label: 'Bedside Table', group: 'Bed 3' },
+    { id: 'stationTable', label: 'Station Table', group: 'Shared Areas' },
+    { id: 'cabinets', label: 'Cabinets', group: 'Shared Areas' }
+  ];
+  var state = {};
+  var actionsTaken = {};
+  var pendingItem = null;
+  items.forEach(function(it){ state[it.id] = null; }); // null | 'done' | 'na' | 'biomed'
+
+  // --- draft autosave: local-only, 4-hour expiry ---
+  var DRAFT_KEY = 'pacu_draft_damp-dusting';
+  var DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000;
+  function saveDraft() {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), state: state, actionsTaken: actionsTaken }));
+  }
+  function tryRestoreDraft() {
+    var raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    try {
+      var draft = JSON.parse(raw);
+      if (Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) { localStorage.removeItem(DRAFT_KEY); return; }
+      Object.assign(state, draft.state);
+      Object.assign(actionsTaken, draft.actionsTaken || {});
+    } catch (e) { localStorage.removeItem(DRAFT_KEY); }
+  }
+  tryRestoreDraft();
+
+  function render() {
+    var pane = document.getElementById('togglesPane');
+    pane.innerHTML = '';
+    var columns = {}; // one column div per group, in first-seen order
+
+    items.forEach(function(it){
+      if (!columns[it.group]) {
+        var col = document.createElement('div');
+        col.className = 'group-column';
+        var label = document.createElement('div');
+        label.className = 'group-label';
+        label.textContent = it.group;
+        col.appendChild(label);
+        pane.appendChild(col);
+        columns[it.group] = col;
+      }
+
+      var decision = state[it.id]; // null | 'done' | 'na' | 'biomed'
+      var rowStatus = decision === 'done' ? 'done' : decision === 'na' ? 'na' : decision === 'biomed' ? 'flag' : 'pending';
+      var row = document.createElement('div');
+      row.className = 'toggle-row is-' + rowStatus;
+      row.innerHTML = '<span>' + it.label + '</span>';
+
+      var btnRow = document.createElement('div');
+      btnRow.className = 'pf-buttons';
+
+      var doneBtn = document.createElement('button');
+      doneBtn.className = 'pf-btn done' + (decision === 'done' ? ' selected' : '');
+      doneBtn.textContent = 'Done';
+      doneBtn.onclick = function(){ state[it.id] = 'done'; render(); };
+
+      var naBtn = document.createElement('button');
+      naBtn.className = 'pf-btn na' + (decision === 'na' ? ' selected' : '');
+      naBtn.textContent = 'N/A';
+      naBtn.onclick = function(){ state[it.id] = 'na'; render(); };
+
+      var biomedBtn = document.createElement('button');
+      biomedBtn.className = 'pf-btn biomed' + (decision === 'biomed' ? ' selected' : '');
+      biomedBtn.textContent = 'BioMed';
+      biomedBtn.onclick = function(){
+        state[it.id] = 'biomed';
+        pendingItem = it;
+        document.getElementById('biomedPopupTitle').textContent = it.label + ' (' + it.group + ') — sent to BioMed';
+        document.getElementById('biomedActionsInput').value = actionsTaken[it.id] || '';
+        document.getElementById('biomedPopupOverlay').classList.add('show');
+        render();
+      };
+
+      btnRow.appendChild(doneBtn); btnRow.appendChild(naBtn); btnRow.appendChild(biomedBtn);
+      row.appendChild(btnRow);
+      columns[it.group].appendChild(row);
+    });
+
+    updateProgress();
+  }
+
+  function updateProgress() {
+    var resolved = items.filter(function(it){ return !!state[it.id]; }).length;
+    document.getElementById('progressFill').style.width = (resolved / items.length * 100) + '%';
+    document.getElementById('progressText').textContent = resolved + ' / ' + items.length;
+    document.getElementById('continueBtn').style.display = resolved === items.length ? 'flex' : 'none';
+    saveDraft();
+  }
+
+  document.getElementById('biomedPopupSubmit').addEventListener('click', function(){
+    if (pendingItem) {
+      actionsTaken[pendingItem.id] = document.getElementById('biomedActionsInput').value;
+    }
+    document.getElementById('biomedPopupOverlay').classList.remove('show');
+    pendingItem = null;
+    saveDraft();
+  });
+
+  document.getElementById('continueBtn').addEventListener('click', function(){
+    document.getElementById('advanceOverlay').classList.add('show');
+  });
+
+  render();
+</script>
+</body>
+</html>

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PACU — Medical Gases Monitoring</title>
+<style>
+  :root {
+    --fern: #7F9F49;
+    --fern-strong: #5C7A32;
+    --danger: #C4432E;
+    --ink: #2A2A26;
+    color-scheme: light;
+    box-sizing: border-box;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #F2F1ED;
+    color: var(--ink);
+    overscroll-behavior: none;
+  }
+  .screen {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .opener-topnav {
+    flex: 0 0 auto;
+    display: flex; gap: 8px;
+    padding: 8px 10px 4px;
+    background: #1a1a18;
+  }
+  .opener-topnav a {
+    flex: 1; text-align: center; text-decoration: none;
+    font-size: 11px; font-weight: 800; color: #fff;
+    background: rgba(255,255,255,0.12);
+    padding: 7px 10px; border-radius: 999px;
+  }
+  .opener-topnav a.logout-link { background: rgba(196,67,46,0.35); }
+
+  .banner {
+    flex: 0 0 auto;
+    background: linear-gradient(135deg, #E7EFDC, #DCE8D0);
+    padding: 10px 16px 8px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .banner h1 {
+    font-size: 13.5px; font-weight: 700; margin: 0;
+    background: var(--fern); color: #fff;
+    display: inline-block; padding: 6px 14px; border-radius: 999px;
+  }
+
+  .slot-list {
+    flex: 1 1 auto; min-height: 0;
+    display: flex; flex-direction: row;
+    gap: 7px; padding: 8px;
+  }
+  .slot-card {
+    flex: 1 1 0; min-height: 0;
+    display: flex; flex-direction: column;
+    background: #fff; border-radius: 12px; border: 1.5px solid #eae8e0;
+    padding: 8px;
+    overflow: hidden;
+  }
+  .slot-name { font-size: 12px; font-weight: 900; text-align: center; margin-bottom: 3px; color: var(--ink); }
+  .slot-role {
+    font-size: 9.5px; font-weight: 700; text-align: center;
+    border-radius: 999px; padding: 2px 8px; margin: 0 auto 6px;
+    width: fit-content; white-space: nowrap;
+  }
+  .slot-role.hooked { background: #DCE8D0; color: var(--fern-strong); }
+  .slot-role.replaced { background: #DCE8D0; color: var(--fern-strong); }
+
+  .right-col { display: contents; }
+
+  /* height:100% + align-self:center is what makes this work: the height
+     comes from the available flex space (bounded by the viewport layout),
+     and the width is DERIVED from that height via aspect-ratio — not the
+     other way around. That's what avoids both unbounded growth and image
+     distortion. */
+  .tank-wrap {
+    flex: 1 1 auto; min-height: 0;
+    height: 100%;
+    align-self: center;
+    position: relative;
+  }
+  .tank-wrap img { width: 100%; height: 100%; display: block; }
+
+  .on-tank-field {
+    position: absolute;
+    left: 10%;
+    width: 60%;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 2px;
+  }
+  @keyframes labelGlow {
+    0%, 100% { text-shadow: 0 0 4px rgba(255,255,255,0.7), 0 0 4px rgba(255,255,255,0.7); }
+    50% { text-shadow: 0 0 10px rgba(255,255,255,1), 0 0 10px rgba(255,255,255,1); }
+  }
+  .on-tank-field .f-label {
+    font-size: 26px; font-weight: 800; color: var(--ink);
+    animation: labelGlow 1.5s ease-in-out infinite;
+  }
+  .on-tank-field input {
+    width: 100%; height: 50px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 24px; font-weight: 700; text-align: center;
+    border: 1.5px solid rgba(255,255,255,0.65);
+    border-radius: 7px;
+    padding: 0 6px;
+    background: rgba(255,255,255,0.92); color: var(--ink); color-scheme: light;
+  }
+  .on-tank-field.remarks-field { left: 50%; transform: translateX(-50%); width: 80%; }
+  .on-tank-field.remarks-field input { font-weight: 500; font-size: 18px; text-align: left; padding: 0 10px; }
+
+  .entry-stamp {
+    font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.85);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    min-height: 13px;
+  }
+
+  .field-psi { top: 64%; left: 10%; width: 80%; }
+  .field-remarks { top: 83%; }
+
+  .gauge-ring {
+    position: absolute;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 3px solid var(--danger);
+    pointer-events: none;
+  }
+  @keyframes gaugeRingGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(196,67,46,0.6); }
+    50% { box-shadow: 0 0 10px 5px rgba(196,67,46,0.35); }
+  }
+  .gauge-ring { animation: gaugeRingGlow 1.4s ease-in-out infinite; }
+
+  .gauge-arrow {
+    position: absolute;
+    transform: translateY(-50%);
+    font-size: 20px; color: var(--danger);
+    text-shadow: 0 1px 2px rgba(255,255,255,0.6);
+    pointer-events: none;
+  }
+  @keyframes arrowPulse {
+    0%, 100% { transform: translateY(-50%) translateX(0); opacity: 1; }
+    50% { transform: translateY(-50%) translateX(-4px); opacity: 0.6; }
+  }
+  .gauge-arrow { animation: arrowPulse 1.1s ease-in-out infinite; }
+
+  .sling-tag-wrap {
+    position: absolute;
+    top: 14%; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .sling-tag-string {
+    width: 8px; height: 71px;
+    background: repeating-linear-gradient(to bottom, #8a8a86 0 13px, transparent 13px 26px);
+  }
+  .sling-tag {
+    position: relative;
+    min-width: 200px; max-width: 350px;
+    padding: 20px 28px 20px 44px;
+    border-radius: 13px 37px 37px 13px;
+    font-size: 30px; font-weight: 900; line-height: 1.15; text-align: left;
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+    background: var(--fern-strong);
+  }
+  .sling-tag::before {
+    content: ''; position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    width: 14px; height: 14px; border-radius: 50%; background: rgba(255,255,255,0.85);
+  }
+  @keyframes tagGlow {
+    0%, 100% { box-shadow: 0 2px 5px rgba(0,0,0,0.35), 0 0 0 0 rgba(255,255,255,0.6); }
+    50% { box-shadow: 0 2px 5px rgba(0,0,0,0.35), 0 0 10px 3px rgba(255,255,255,0.5); }
+  }
+  .sling-tag { animation: tagGlow 1.4s ease-in-out infinite; }
+
+  .fields-box { display: none; }
+
+  .popup-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; padding: 24px;
+  }
+  .popup-overlay.show { display: flex; }
+  .popup-box { background: #fff; border-radius: 16px; padding: 20px 18px; max-width: 340px; width: 100%; text-align: center; }
+  .popup-box .icon { font-size: 28px; margin-bottom: 6px; }
+  .popup-box h2 { font-size: 15px; margin: 0 0 6px; }
+  .popup-box p { font-size: 13px; color: var(--ink); opacity: 0.8; margin: 0 0 14px; line-height: 1.4; }
+  .popup-box button {
+    width: 100%;
+    background: var(--danger); color: #fff; border: none;
+    padding: 11px 10px; border-radius: 999px; font-weight: 700; font-size: 13.5px; cursor: pointer;
+  }
+  .popup-box button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .popup-stamp { margin: 8px 0 0; font-size: 11px; font-weight: 700; opacity: 0.6; color: var(--ink); }
+  .advance-overlay .popup-box { text-align: center; }
+  .advance-link {
+    display: block; width: 100%;
+    background: var(--fern); color: #fff; border: none; text-decoration: none;
+    padding: 12px 10px; border-radius: 999px; font-weight: 700; font-size: 14.5px;
+    box-sizing: border-box; margin-top: 4px;
+  }
+  .err-preview {
+    font-size: 12px; color: var(--danger); background: #FBEAE8;
+    border-radius: 8px; padding: 6px 10px; margin-bottom: 10px; text-align: left;
+  }
+  .popup-box label { font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px; text-align: left; }
+  .popup-box textarea {
+    width: 100%; border-radius: 10px; border: 1px solid #ddd9cf;
+    padding: 8px 10px; font-size: 13px; font-family: inherit;
+    resize: none; background: #fbfaf7; color: var(--ink); color-scheme: light;
+    margin-bottom: 14px;
+  }
+  .source-choice-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .source-btn {
+    flex: 1; border: 1.5px solid #d8d6cf; background: #fff; border-radius: 10px;
+    padding: 12px 8px; font-size: 12.5px; font-weight: 800; color: var(--ink);
+    cursor: pointer;
+  }
+  .source-btn.selected { background: var(--fern-strong); border-color: var(--fern-strong); color: #fff; }
+  #finalSubmitBtn { background: var(--fern) !important; }
+
+  .bottom-sheet {
+    flex: 0 0 auto;
+    padding: 8px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: #fff;
+    border-top: 1px solid rgba(0,0,0,0.06);
+  }
+  .continue-btn {
+    display: none; width: 100%; align-items: center; justify-content: center; gap: 5px;
+    background: var(--fern); color: #fff;
+    padding: 10px; border-radius: 999px;
+    font-size: 14px; font-weight: 700; border: none; cursor: pointer;
+    animation: continuePulse 1.6s ease-in-out infinite;
+  }
+  @keyframes continuePulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(127,159,73,0.5); }
+    50% { box-shadow: 0 0 0 6px rgba(127,159,73,0); }
+  }
+
+  /* === tablet portrait and phones: per-box layout, matching OR's exact
+     700px breakpoint for this section specifically === */
+  @media (max-width: 700px) {
+    .slot-list { flex-direction: column; overflow-y: auto; gap: 6px; }
+    .slot-card { flex-direction: row; align-items: stretch; flex: 1 1 auto; min-height: 170px; padding: 8px; gap: 8px; }
+    .tank-wrap { flex: 0 0 30%; width: 30%; height: 150px; align-self: center; }
+    .tank-wrap img { object-fit: contain; }
+    .tank-wrap .on-tank-field,
+    .tank-wrap .gauge-arrow,
+    .tank-wrap .gauge-ring { display: none; }
+
+    .right-col {
+      display: flex; flex-direction: column;
+      flex: 0 0 70%; width: 70%; min-width: 0; min-height: 0;
+      gap: 6px;
+    }
+    .slot-name, .slot-role { text-align: left; margin: 0; }
+    .right-col > .slot-header {
+      flex: 0 0 auto;
+      display: flex; flex-direction: column; justify-content: center; gap: 3px;
+    }
+    .fields-box {
+      display: flex; flex-direction: column; justify-content: center;
+      gap: 8px;
+      flex: 1 1 auto; min-height: 0;
+      background: #F7F6F2; border-radius: 10px;
+      padding: 8px 10px;
+    }
+    .fields-box .fb-row { display: flex; flex-direction: column; gap: 2px; }
+    .fields-box .fb-label { font-size: 11px; font-weight: 800; color: var(--ink); opacity: 0.75; }
+    .fields-box input {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 17px; font-weight: 700;
+      border: 1px solid #ddd9cf; border-radius: 7px;
+      padding: 7px 9px; height: 40px;
+      background: #fff; color: var(--ink); color-scheme: light;
+    }
+    .fields-box .fb-row.remarks input { font-family: inherit; font-weight: 500; font-size: 13px; }
+    .fields-box .entry-stamp { font-size: 9.5px; font-weight: 700; color: var(--ink); opacity: 0.55; text-shadow: none; }
+    .sling-tag { font-size: 16px; min-width: 100px; max-width: 160px; padding: 9px 12px 9px 22px; }
+    .sling-tag::before { width: 7px; height: 7px; left: 7px; }
+    .sling-tag-string { height: 18px; }
+  }
+</style>
+</head>
+<body>
+  <div class="screen">
+    <div class="opener-topnav">
+      <a href="index.html?view=dashboard">&larr; Back to Dashboard</a>
+      <a class="logout-link" href="index.html">Logout</a>
+    </div>
+    <div class="banner"><h1>Medical Gases Monitoring</h1></div>
+
+    <div class="slot-list" id="slotList"></div>
+
+    <div class="bottom-sheet">
+      <button class="continue-btn" id="continueBtn">Continue →</button>
+    </div>
+  </div>
+
+  <div class="popup-overlay" id="lowPsiOverlay">
+    <div class="popup-box">
+      <div class="icon">⚠️</div>
+      <h2>Tank Needs Replacement</h2>
+      <p id="lowPsiMessage">Reading is below 30 PSI — this tank must be replaced before use.</p>
+      <div class="source-choice-row">
+        <button type="button" class="source-btn" id="sourceFreshBtn">Fresh Full Tank</button>
+        <button type="button" class="source-btn" id="sourceOrBtn">From OR (repurposed)</button>
+      </div>
+      <div id="orPsiRow" style="display:none; margin-bottom: 12px;">
+        <label for="orPsiInput" style="font-size:12px; font-weight:700; display:block; margin-bottom:4px; text-align:left;">How many PSI left in this tank?</label>
+        <input type="number" id="orPsiInput" placeholder="e.g. 420" style="width:100%; box-sizing:border-box; padding:9px 11px; border-radius:9px; border:1px solid #d8d6cf; font-size:14px; font-family:inherit; color-scheme:light;">
+      </div>
+      <button id="lowPsiConfirm" disabled>Confirm — Tank Replaced</button>
+      <p class="popup-stamp" id="lowPsiStamp"></p>
+    </div>
+  </div>
+
+  <div class="popup-overlay" id="remarksActionsOverlay">
+    <div class="popup-box">
+      <div class="icon">⚠️</div>
+      <h2>Abnormal Reading Noted</h2>
+      <div class="err-preview" id="remarksActionsPreview"></div>
+      <label for="remarksActionsInput">Actions taken</label>
+      <textarea id="remarksActionsInput" rows="3" placeholder="What was done in response?"></textarea>
+      <button id="remarksActionsSubmit" style="background:var(--fern);">Submit — this will be recorded</button>
+    </div>
+  </div>
+
+  <div class="popup-overlay advance-overlay" id="advanceOverlay">
+    <div class="popup-box">
+      <div class="icon">✅</div>
+      <h2>Section Complete</h2>
+      <p>Next: Laptop Wipedown</p>
+      <a class="advance-link" href="pacu-laptop-wipedown.html">Continue to Laptop Wipedown →</a>
+    </div>
+  </div>
+
+<script>
+  // --- Supabase: shared insert helper + global error capture ---
+  var SUPABASE_URL = 'https://jgnweipcjghgdnktpsww.supabase.co';
+  var SUPABASE_ANON_KEY = 'sb_publishable_qIvxyRTzz7Zc6F7wDD8E_g_aj5JAu66';
+  function supabaseInsert(table, row) {
+    return fetch(SUPABASE_URL + '/rest/v1/' + table, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(row)
+    });
+  }
+  function reportError(message, stack, extra) {
+    supabaseInsert('error_reports', {
+      message: String(message || '').slice(0, 2000),
+      stack: String(stack || '').slice(0, 4000),
+      context: (extra || '') + ' @ ' + location.pathname,
+      reported_by: (typeof currentStaff !== 'undefined' && currentStaff) ? currentStaff.name : null,
+      view: location.pathname,
+      occurred_at: new Date().toISOString()
+    }).catch(function(){}); // never let error reporting itself throw
+  }
+  window.addEventListener('error', function(e){
+    reportError(e.message, e.error ? e.error.stack : '', 'window.onerror');
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    var reason = e.reason;
+    reportError(
+      'Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason),
+      reason && reason.stack ? reason.stack : '',
+      'unhandledrejection'
+    );
+  });
+
+  // Every bed here is structurally identical to OR's "Compressed Air" slot
+  // — single gauge, no spare, simple replace-in-place — just repeated
+  // three times, one per bed, with PACU's own 30 PSI threshold.
+  var O2_IMG = 'images/o2Tank.png';
+  var O2_ASPECT = '223/681';
+  var GAUGE = { top: 1.47, left: 64.57, width: 19.73 }; // measured against
+  // the full uncropped image — correct here because height:100% bounds the
+  // container from the viewport layout, not from the image's own size
+
+  var slots = [
+    { id: 'bed1', label: 'Bed 1 — O2 Tank', role: 'In Use', roleClass: 'hooked', status: 'normal', lowPsiThreshold: 30 },
+    { id: 'bed2', label: 'Bed 2 — O2 Tank', role: 'In Use', roleClass: 'hooked', status: 'normal', lowPsiThreshold: 30 },
+    { id: 'bed3', label: 'Bed 3 — O2 Tank', role: 'In Use', roleClass: 'hooked', status: 'normal', lowPsiThreshold: 30 }
+  ];
+  var slotById = {};
+  slots.forEach(function(s){ slotById[s.id] = s; });
+
+  var values = {};
+  var replacementSource = {}; // per slot id: null | 'fresh' | 'or'
+  var replacementOrPsi = {}; // per slot id: verified starting PSI, only set when source is 'or'
+  slots.forEach(function(s){
+    values[s.id] = { psi: '', remarks: '', psiStamp: null, remarksStamp: null, actionsTaken: '', remarksPopupShown: false };
+    replacementSource[s.id] = null;
+    replacementOrPsi[s.id] = null;
+  });
+
+  // --- draft autosave: local-only, 4-hour expiry ---
+  var DRAFT_KEY = 'pacu_draft_medical-gases';
+  var DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000;
+  function saveDraft() {
+    var slotSnapshot = {};
+    slots.forEach(function(s){ slotSnapshot[s.id] = { status: s.status, role: s.role, roleClass: s.roleClass }; });
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), values: values, slotSnapshot: slotSnapshot, replacementSource: replacementSource, replacementOrPsi: replacementOrPsi }));
+  }
+  function tryRestoreDraft() {
+    var raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    try {
+      var draft = JSON.parse(raw);
+      if (Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) { localStorage.removeItem(DRAFT_KEY); return; }
+      Object.keys(draft.values || {}).forEach(function(id){
+        if (!values[id]) return;
+        var v = draft.values[id];
+        values[id].psi = v.psi || ''; values[id].remarks = v.remarks || '';
+        values[id].actionsTaken = v.actionsTaken || ''; values[id].remarksPopupShown = !!v.remarksPopupShown;
+        values[id].psiStamp = v.psiStamp ? new Date(v.psiStamp) : null;
+        values[id].remarksStamp = v.remarksStamp ? new Date(v.remarksStamp) : null;
+      });
+      Object.keys(draft.slotSnapshot || {}).forEach(function(id){ if (slotById[id]) Object.assign(slotById[id], draft.slotSnapshot[id]); });
+      Object.assign(replacementSource, draft.replacementSource || {});
+      Object.assign(replacementOrPsi, draft.replacementOrPsi || {});
+    } catch (e) { localStorage.removeItem(DRAFT_KEY); }
+  }
+  tryRestoreDraft();
+
+  function formatStamp(d){
+    return d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ', ' +
+           d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+  }
+  function showStamp(slotId, field, text){
+    [field + '-stamp', field + '-stamp-mobile'].forEach(function(suffix){
+      var el = document.getElementById(slotId + '-' + suffix);
+      if (el) el.textContent = '🕐 ' + text;
+    });
+  }
+  function aspectW(ratioStr){ return parseFloat(ratioStr.split('/')[0]); }
+  function aspectH(ratioStr){ return parseFloat(ratioStr.split('/')[1]); }
+
+  var listEl = document.getElementById('slotList');
+  var cardEls = {};
+  var pendingLowPsiSlot = null;
+  var pendingRemarksSlot = null;
+
+  function handlePsiChange(slot, rawVal){
+    values[slot.id].psi = rawVal;
+    ['-psi', '-psi-mobile'].forEach(function(suffix){
+      var el = document.getElementById(slot.id + suffix);
+      if (el && el.value !== rawVal) el.value = rawVal;
+    });
+    if (rawVal.trim().length > 0) {
+      var now = new Date();
+      values[slot.id].psiStamp = now;
+      showStamp(slot.id, 'psi', formatStamp(now));
+    }
+    var val = parseFloat(rawVal);
+    if (!isNaN(val) && val < slot.lowPsiThreshold) {
+      pendingLowPsiSlot = slot;
+      document.getElementById('lowPsiMessage').textContent =
+        slot.label + ': ' + val + ' PSI — below the ' + slot.lowPsiThreshold + ' PSI threshold. This tank must be replaced before use.';
+      document.getElementById('sourceFreshBtn').classList.remove('selected');
+      document.getElementById('sourceOrBtn').classList.remove('selected');
+      document.getElementById('orPsiRow').style.display = 'none';
+      document.getElementById('orPsiInput').value = '';
+      document.getElementById('lowPsiConfirm').disabled = true;
+      document.getElementById('lowPsiOverlay').classList.add('show');
+    }
+    checkAllResolved();
+  }
+
+  function isSlotResolved(slot){
+    return slot.status !== 'normal' || values[slot.id].psi.trim().length > 0;
+  }
+  function checkAllResolved(){
+    var allResolved = slots.every(isSlotResolved);
+    document.getElementById('continueBtn').style.display = allResolved ? 'flex' : 'none';
+    saveDraft();
+  }
+  function handleRemarksLiveSync(slot, rawVal){
+    values[slot.id].remarks = rawVal;
+    ['-remarks', '-remarks-mobile'].forEach(function(suffix){
+      var el = document.getElementById(slot.id + suffix);
+      if (el && el.value !== rawVal) el.value = rawVal;
+    });
+  }
+  function handleRemarksCommit(slot, rawVal){
+    if (rawVal.trim().length === 0) { values[slot.id].remarksPopupShown = false; return; }
+    var now = new Date();
+    values[slot.id].remarksStamp = now;
+    showStamp(slot.id, 'remarks', formatStamp(now));
+    if (!values[slot.id].remarksPopupShown) {
+      values[slot.id].remarksPopupShown = true;
+      pendingRemarksSlot = slot;
+      document.getElementById('remarksActionsPreview').textContent = slot.label + ': ' + rawVal;
+      document.getElementById('remarksActionsInput').value = values[slot.id].actionsTaken || '';
+      document.getElementById('remarksActionsOverlay').classList.add('show');
+    }
+    saveDraft();
+  }
+
+  function renderCard(slot){
+    var card = cardEls[slot.id] || document.createElement('div');
+    card.className = 'slot-card';
+    card.innerHTML = '';
+
+    var tankWrap = document.createElement('div');
+    tankWrap.className = 'tank-wrap';
+    tankWrap.style.aspectRatio = O2_ASPECT;
+
+    var overlayHtml;
+    if (slot.status === 'replaced') {
+      var sourceLabel = replacementSource[slot.id] === 'fresh'
+        ? 'Replaced — Fresh Full'
+        : 'Replaced — From OR (' + (replacementOrPsi[slot.id] || '—') + ' PSI)';
+      overlayHtml = '<div class="sling-tag-wrap"><div class="sling-tag-string"></div><div class="sling-tag">' + sourceLabel + '</div></div>';
+    } else {
+      var g = GAUGE;
+      var ringHeightPct = g.width * aspectW(O2_ASPECT) / aspectH(O2_ASPECT);
+      var arrowTop = g.top + ringHeightPct/2;
+      var arrowLeft = g.left + g.width + 1;
+      overlayHtml =
+        '<div class="gauge-ring" style="top:' + g.top + '%; left:' + g.left + '%; width:' + g.width + '%;"></div>' +
+        '<div class="gauge-arrow" style="top:' + arrowTop + '%; left:' + arrowLeft + '%;">◀</div>' +
+        '<div class="on-tank-field field-psi">' +
+          '<span class="f-label">PSI (tank contents)</span>' +
+          '<input type="number" placeholder="—" id="' + slot.id + '-psi" value="' + values[slot.id].psi + '">' +
+          '<span class="entry-stamp" id="' + slot.id + '-psi-stamp">' + (values[slot.id].psiStamp ? '🕐 ' + formatStamp(values[slot.id].psiStamp) : '') + '</span>' +
+        '</div>' +
+        '<div class="on-tank-field remarks-field field-remarks">' +
+          '<span class="f-label">REMARKS</span>' +
+          '<input type="text" placeholder="Optional" id="' + slot.id + '-remarks" value="' + values[slot.id].remarks + '">' +
+          '<span class="entry-stamp" id="' + slot.id + '-remarks-stamp">' + (values[slot.id].remarksStamp ? '🕐 ' + formatStamp(values[slot.id].remarksStamp) : '') + '</span>' +
+        '</div>';
+    }
+    tankWrap.innerHTML = '<img src="' + O2_IMG + '" alt="' + slot.label + '">' + overlayHtml;
+
+    var rightCol = document.createElement('div');
+    rightCol.className = 'right-col';
+
+    var header = document.createElement('div');
+    header.className = 'slot-header';
+    header.innerHTML = '<div class="slot-name">' + slot.label + '</div><div class="slot-role ' + slot.roleClass + '">' + slot.role + '</div>';
+    rightCol.appendChild(header);
+
+    var fieldsBox = document.createElement('div');
+    fieldsBox.className = 'fields-box';
+    if (slot.status === 'normal') {
+      fieldsBox.innerHTML =
+        '<div class="fb-row">' +
+          '<span class="fb-label">PSI (tank contents)</span>' +
+          '<input type="number" placeholder="—" id="' + slot.id + '-psi-mobile" value="' + values[slot.id].psi + '">' +
+          '<span class="entry-stamp" id="' + slot.id + '-psi-stamp-mobile">' + (values[slot.id].psiStamp ? '🕐 ' + formatStamp(values[slot.id].psiStamp) : '') + '</span>' +
+        '</div>' +
+        '<div class="fb-row remarks">' +
+          '<span class="fb-label">Remarks</span>' +
+          '<input type="text" placeholder="Optional" id="' + slot.id + '-remarks-mobile" value="' + values[slot.id].remarks + '">' +
+          '<span class="entry-stamp" id="' + slot.id + '-remarks-stamp-mobile">' + (values[slot.id].remarksStamp ? '🕐 ' + formatStamp(values[slot.id].remarksStamp) : '') + '</span>' +
+        '</div>';
+    }
+    rightCol.appendChild(fieldsBox);
+
+    card.appendChild(tankWrap);
+    card.appendChild(rightCol);
+
+    if (!cardEls[slot.id]) { cardEls[slot.id] = card; listEl.appendChild(card); }
+
+    if (slot.status === 'normal') {
+      ['-psi', '-psi-mobile'].forEach(function(suffix){
+        var el = document.getElementById(slot.id + suffix);
+        if (el) el.addEventListener('change', function(){ handlePsiChange(slot, el.value); });
+      });
+      ['-remarks', '-remarks-mobile'].forEach(function(suffix){
+        var el = document.getElementById(slot.id + suffix);
+        if (el) {
+          el.addEventListener('input', function(){ handleRemarksLiveSync(slot, el.value); });
+          el.addEventListener('change', function(){ handleRemarksCommit(slot, el.value); });
+        }
+      });
+    }
+  }
+
+  slots.forEach(renderCard);
+  checkAllResolved();
+
+  document.getElementById('sourceFreshBtn').addEventListener('click', function(){
+    this.classList.add('selected');
+    document.getElementById('sourceOrBtn').classList.remove('selected');
+    document.getElementById('orPsiRow').style.display = 'none';
+    // a fresh tank needs no PSI verification — assumed near-full
+    document.getElementById('lowPsiConfirm').disabled = false;
+    document.getElementById('lowPsiConfirm').dataset.source = 'fresh';
+  });
+  document.getElementById('sourceOrBtn').addEventListener('click', function(){
+    this.classList.add('selected');
+    document.getElementById('sourceFreshBtn').classList.remove('selected');
+    document.getElementById('orPsiRow').style.display = 'block';
+    // a repurposed OR tank isn't assumed full — Confirm stays locked until
+    // its actual starting PSI is entered
+    document.getElementById('lowPsiConfirm').disabled = document.getElementById('orPsiInput').value.trim().length === 0;
+    document.getElementById('lowPsiConfirm').dataset.source = 'or';
+  });
+  document.getElementById('orPsiInput').addEventListener('input', function(){
+    if (document.getElementById('lowPsiConfirm').dataset.source === 'or') {
+      document.getElementById('lowPsiConfirm').disabled = this.value.trim().length === 0;
+    }
+  });
+
+  document.getElementById('continueBtn').addEventListener('click', function(){
+    document.getElementById('advanceOverlay').classList.add('show');
+  });
+
+  document.getElementById('lowPsiConfirm').addEventListener('click', function(){
+    if (this.disabled || !pendingLowPsiSlot) return;
+    document.getElementById('lowPsiStamp').textContent = '🕐 Confirmed ' + formatStamp(new Date());
+    document.getElementById('lowPsiOverlay').classList.remove('show');
+    var emptiedSlot = pendingLowPsiSlot;
+    replacementSource[emptiedSlot.id] = this.dataset.source;
+    replacementOrPsi[emptiedSlot.id] = this.dataset.source === 'or' ? document.getElementById('orPsiInput').value.trim() : null;
+    pendingLowPsiSlot = null;
+
+    emptiedSlot.status = 'replaced';
+    emptiedSlot.role = 'Replaced ✓';
+    emptiedSlot.roleClass = 'replaced';
+    values[emptiedSlot.id] = { psi: '', remarks: '', psiStamp: null, remarksStamp: null, actionsTaken: '', remarksPopupShown: false };
+    renderCard(emptiedSlot);
+    checkAllResolved();
+  });
+
+  document.getElementById('remarksActionsSubmit').addEventListener('click', function(){
+    if (pendingRemarksSlot) { values[pendingRemarksSlot.id].actionsTaken = document.getElementById('remarksActionsInput').value; }
+    document.getElementById('remarksActionsOverlay').classList.remove('show');
+    pendingRemarksSlot = null;
+    saveDraft();
+  });
+
+  // Submit now lives on the final section (Laptop Wipedown) — this section
+  // just advances forward like every other section in the chain.
+</script>
+</body>
+</html>

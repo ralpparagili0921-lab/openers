@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Damp Dusting — Prototype</title>
+<style>
+  :root {
+    --fern: #7F9F49;
+    --danger: #C4432E;
+    --ink: #2A2A26;
+    color-scheme: light;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #111;
+    color: var(--ink);
+    overscroll-behavior: none;
+  }
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .room-bg {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .topbar {
+    position: absolute; top: 38px; left: 0; right: 0;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0));
+    gap: 10px;
+  }
+  .topbar h1 {
+    font-size: 14px; font-weight: 700; color: #fff; margin: 0;
+    background: rgba(0,0,0,0.55);
+    padding: 9px 14px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .check-all {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.92);
+    padding: 7px 12px; border-radius: 999px;
+    font-size: 13px; font-weight: 600; color: var(--ink);
+    border: none; cursor: pointer;
+  }
+  .check-all input { width: 15px; height: 15px; accent-color: var(--fern); }
+
+  .continue-btn {
+    display: none; align-items: center; gap: 5px;
+    background: var(--fern); color: #fff;
+    padding: 7px 14px; border-radius: 999px;
+    font-size: 13px; font-weight: 700; border: none; cursor: pointer;
+    animation: continuePulse 1.6s ease-in-out infinite;
+  }
+  @keyframes continuePulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(127,159,73,0.55); }
+    50% { box-shadow: 0 0 0 7px rgba(127,159,73,0); }
+  }
+
+  .room-item { position: absolute; }
+  .room-item img {
+    height: 100%; width: auto; display: block;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.18));
+  }
+  .item-light     { top: 2%; left: 50%; transform: translateX(-50%); height: 24%; }
+  .item-table     { top: 46%; left: 50%; transform: translateX(-50%); height: 30%; }
+  .item-backtable { top: 50%; left: 10%; height: 26%; }
+  .item-mayo      { top: 50%; left: 78%; height: 22%; }
+
+  @media (max-width: 600px) {
+    .item-table     { height: 24%; }
+    .item-backtable { height: 20%; top: 62%; left: 8%; }
+    .item-mayo      { height: 17%; top: 64%; left: 65%; }
+  }
+  @media (max-width: 400px) {
+    .item-table     { height: 20%; }
+    .item-backtable { height: 17%; top: 70%; left: 6%; }
+    .item-mayo      { height: 14%; top: 72%; left: 58%; }
+  }
+
+  .item-tag {
+    position: absolute;
+    bottom: -34px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 7px;
+    background: rgba(0,0,0,0.55);
+    padding: 4px 12px 4px 4px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .marker {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    background: rgba(120,120,112,0.85);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .marker:active { transform: scale(0.92); }
+  .marker.done { background: var(--fern); }
+  .marker.flag { background: var(--danger); }
+  .marker svg { width: 15px; height: 15px; opacity: 0; transition: opacity 0.15s; position: absolute; }
+  .marker.done svg.check-icon { opacity: 1; }
+  .marker.flag svg.flag-icon { opacity: 1; }
+
+  @keyframes markerGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.6); }
+    50% { box-shadow: 0 0 0 9px rgba(255,255,255,0); }
+  }
+  .marker.pending { animation: markerGlow 1.5s ease-in-out infinite; }
+
+  .item-label { font-size: 12px; font-weight: 700; color: #fff; }
+
+  .bottom-sheet {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.55) 40%, rgba(0,0,0,0.65));
+  }
+  .progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .progress-track { flex: 1; height: 6px; background: rgba(255,255,255,0.3); border-radius: 999px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--fern); width: 0%; transition: width 0.25s; }
+  .progress-text { font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; }
+  .session-stamp { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.75); margin-bottom: 8px; }
+  textarea {
+    width: 100%; border-radius: 10px; border: none;
+    padding: 10px 12px; font-size: 14px; font-family: inherit;
+    resize: none; background: rgba(255,255,255,0.95);
+    color: var(--ink); color-scheme: light;
+  }
+  textarea::placeholder { color: #8a8a86; }
+  textarea.needs-input { box-shadow: 0 0 0 2.5px var(--danger); }
+
+  .instruction-strip {
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    background: rgba(0,0,0,0.35);
+    padding: 10px 16px; border-radius: 14px;
+    font-size: 18.5px; font-weight: 700; color: #fff;
+    margin-bottom: 12px;
+  }
+  .instruction-strip .dot {
+    width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .instruction-strip .dot.pending { background: rgba(255,255,255,0.35); }
+  .instruction-strip .dot.done { background: var(--fern); }
+  .instruction-strip .dot.flag { background: var(--danger); }
+  .instruction-strip .step { display: flex; align-items: center; gap: 8px; }
+  .instruction-strip .arrow { opacity: 0.6; font-size: 15px; }
+  @media (max-width: 420px) {
+    .instruction-strip { font-size: 15px; gap: 10px; padding: 9px 12px; flex-wrap: wrap; }
+  }
+
+  .popup-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; padding: 24px;
+  }
+  .popup-overlay.show { display: flex; }
+  .popup-box { background: #fff; border-radius: 16px; padding: 22px 20px; max-width: 320px; text-align: center; }
+  .popup-box .icon { font-size: 30px; margin-bottom: 8px; }
+  .popup-box p { font-size: 14.5px; color: var(--ink); margin: 0 0 16px; line-height: 1.45; }
+  .popup-box button {
+    background: var(--fern); color: #fff; border: none;
+    padding: 10px 28px; border-radius: 999px; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+
+  .advance-overlay .popup-box { text-align: center; }
+  .advance-link {
+    display: block; width: 100%;
+    background: var(--fern); color: #fff; border: none; text-decoration: none;
+    padding: 12px 10px; border-radius: 999px; font-weight: 700; font-size: 14.5px;
+    box-sizing: border-box; margin-top: 4px;
+  }
+
+  .opener-topnav {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 50;
+    display: flex; gap: 8px;
+    padding: calc(6px + env(safe-area-inset-top, 0px)) 10px 6px;
+    background: rgba(26,26,24,0.75);
+  }
+  .opener-topnav a {
+    flex: 1; text-align: center; text-decoration: none;
+    font-size: 10.5px; font-weight: 800; color: #fff;
+    background: rgba(255,255,255,0.15);
+    padding: 6px 10px; border-radius: 999px;
+  }
+  .opener-topnav a.logout-link { background: rgba(196,67,46,0.4); }
+</style>
+</head>
+<body>
+  <div class="scene">
+    <div class="opener-topnav"><a href="index.html?view=dashboard">&larr; Back to Dashboard</a><a class="logout-link" href="index.html">Logout</a></div>
+
+    <img class="room-bg" src="images/room-background.jpg" alt="">
+
+    <div class="topbar">
+      <h1>Surface Cleaning — Damp Dusting</h1>
+      <div class="topbar-actions">
+        <button class="check-all" id="checkAllBtn">
+          <input type="checkbox" id="checkAll" tabindex="-1">
+          Check all
+        </button>
+        <button class="continue-btn" id="continueBtn">Continue →</button>
+      </div>
+    </div>
+
+    <div class="room-item item-light">
+      <img src="images/or-light.png" alt="">
+      <div class="item-tag">
+        <button class="marker pending" id="pt-light" aria-label="OR light"><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12 9 17 20 6"></polyline></svg><svg class="flag-icon" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"></path><path d="M5 4h11l-2 4 2 4H5"></path></svg></button>
+        <span class="item-label">OR Light</span>
+      </div>
+    </div>
+
+    <div class="room-item item-table">
+      <img src="images/damp-or-table.png" alt="">
+      <div class="item-tag">
+        <button class="marker pending" id="pt-table" aria-label="OR table"><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12 9 17 20 6"></polyline></svg><svg class="flag-icon" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"></path><path d="M5 4h11l-2 4 2 4H5"></path></svg></button>
+        <span class="item-label">OR Table</span>
+      </div>
+    </div>
+
+    <div class="room-item item-backtable">
+      <img src="images/back-table.png" alt="">
+      <div class="item-tag">
+        <button class="marker pending" id="pt-back" aria-label="Back table"><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12 9 17 20 6"></polyline></svg><svg class="flag-icon" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"></path><path d="M5 4h11l-2 4 2 4H5"></path></svg></button>
+        <span class="item-label">Back Table</span>
+      </div>
+    </div>
+
+    <div class="room-item item-mayo">
+      <img src="images/mayo-tray.png" alt="">
+      <div class="item-tag">
+        <button class="marker pending" id="pt-mayo" aria-label="Mayo tray"><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12 9 17 20 6"></polyline></svg><svg class="flag-icon" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"></path><path d="M5 4h11l-2 4 2 4H5"></path></svg></button>
+        <span class="item-label">Mayo Tray</span>
+      </div>
+    </div>
+
+    <div class="bottom-sheet">
+      <div class="progress-row">
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <span class="progress-text" id="progressText">0 / 4</span>
+      </div>
+      <div class="session-stamp" id="sessionStamp"></div>
+      <div class="instruction-strip">
+        <span class="step"><span class="dot pending"></span>Tap once = clean</span>
+        <span class="arrow">›</span>
+        <span class="step"><span class="dot flag"></span>Tap again = report problem</span>
+      </div>
+      <textarea id="remarksInput" rows="2" placeholder="Remarks (optional)"></textarea>
+    </div>
+  </div>
+
+  <div class="popup-overlay" id="popupOverlay">
+    <div class="popup-box">
+      <div class="icon">⚠️</div>
+      <p>A problem was reported on one or more items. Please add a comment in Remarks describing it before continuing.</p>
+      <button id="popupOk">OK</button>
+    </div>
+  </div>
+
+  <div class="popup-overlay advance-overlay" id="advanceOverlay">
+    <div class="popup-box">
+      <div class="icon">✅</div>
+      <h2>Section Complete</h2>
+      <p>Next: Surface Cleaning for Electronics</p>
+      <a class="advance-link" href="or-electronics-cleaning.html">Continue to Surface Cleaning for Electronics →</a>
+    </div>
+  </div>
+
+<script>
+  // --- Supabase: shared insert helper + global error capture ---
+  var SUPABASE_URL = 'https://jgnweipcjghgdnktpsww.supabase.co';
+  var SUPABASE_ANON_KEY = 'sb_publishable_qIvxyRTzz7Zc6F7wDD8E_g_aj5JAu66';
+  function supabaseInsert(table, row) {
+    return fetch(SUPABASE_URL + '/rest/v1/' + table, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(row)
+    });
+  }
+  function reportError(message, stack, extra) {
+    supabaseInsert('error_reports', {
+      message: String(message || '').slice(0, 2000),
+      stack: String(stack || '').slice(0, 4000),
+      context: (extra || '') + ' @ ' + location.pathname,
+      reported_by: (typeof currentStaff !== 'undefined' && currentStaff) ? currentStaff.name : null,
+      view: location.pathname,
+      occurred_at: new Date().toISOString()
+    }).catch(function(){}); // never let error reporting itself throw
+  }
+  window.addEventListener('error', function(e){
+    reportError(e.message, e.error ? e.error.stack : '', 'window.onerror');
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    var reason = e.reason;
+    reportError(
+      'Unhandled promise rejection: ' + (reason && reason.message ? reason.message : reason),
+      reason && reason.stack ? reason.stack : '',
+      'unhandledrejection'
+    );
+  });
+
+  var points = ['pt-light', 'pt-table', 'pt-back', 'pt-mayo'];
+  var state = {};
+
+  // this is the first section of the checklist — only ONE timestamp is
+  // needed here, capturing the moment the opener actually began the
+  // routine, not a per-item stamp like Temp/Humidity or Medical Gases get
+  var checklistStartedAt = null;
+  function formatStamp(d){
+    return d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ', ' +
+           d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+  }
+  function markChecklistStarted(){
+    if (checklistStartedAt) return;
+    checklistStartedAt = new Date();
+    document.getElementById('sessionStamp').textContent = '🕐 Checklist started ' + formatStamp(checklistStartedAt);
+  }
+
+  function paint(id) {
+    var btn = document.getElementById(id);
+    var cls = 'marker';
+    if (state[id] === 'done') cls += ' done';
+    else if (state[id] === 'flag') cls += ' flag';
+    else cls += ' pending';
+    btn.className = cls;
+  }
+  function updateProgress() {
+    var doneCount = points.filter(function(p){ return state[p] === 'done'; }).length;
+    var flagCount = points.filter(function(p){ return state[p] === 'flag'; }).length;
+    var resolvedCount = doneCount + flagCount;
+    document.getElementById('progressFill').style.width = (resolvedCount / points.length * 100) + '%';
+    document.getElementById('progressText').textContent = resolvedCount + ' / ' + points.length;
+    document.getElementById('checkAll').checked = doneCount === points.length;
+    document.getElementById('continueBtn').style.display = resolvedCount === points.length ? 'flex' : 'none';
+    saveDraft();
+  }
+  // --- draft autosave: local-only, 4-hour expiry, nothing goes to a real
+  // backend until the whole checklist is submitted (that's built later) ---
+  var DRAFT_KEY = 'opener_draft_damp-dusting';
+  var DRAFT_MAX_AGE_MS = 4 * 60 * 60 * 1000;
+  function saveDraft() {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), state: state, remarks: remarksElVal() }));
+  }
+  function remarksElVal(){ var el = document.getElementById('remarksInput'); return el ? el.value : ''; }
+  function tryRestoreDraft() {
+    var raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    try {
+      var draft = JSON.parse(raw);
+      if (Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) { localStorage.removeItem(DRAFT_KEY); return; }
+      Object.assign(state, draft.state);
+      setTimeout(function(){
+        var el = document.getElementById('remarksInput');
+        if (el && draft.remarks) el.value = draft.remarks;
+      }, 0);
+    } catch (e) { localStorage.removeItem(DRAFT_KEY); }
+  }
+  tryRestoreDraft();
+
+  points.forEach(function(id) {
+    if (!state[id]) state[id] = 'pending';
+    document.getElementById(id).addEventListener('click', function(e){
+      e.stopPropagation();
+      markChecklistStarted();
+      state[id] = state[id] === 'pending' ? 'done' : state[id] === 'done' ? 'flag' : 'pending';
+      paint(id);
+      updateProgress();
+    });
+    paint(id);
+  });
+  document.getElementById('checkAllBtn').addEventListener('click', function(){
+    markChecklistStarted();
+    var allDone = points.every(function(p){ return state[p] === 'done'; });
+    points.forEach(function(id){ state[id] = allDone ? 'pending' : 'done'; paint(id); });
+    updateProgress();
+  });
+
+  var remarksEl = document.getElementById('remarksInput');
+  var popupEl = document.getElementById('popupOverlay');
+  document.getElementById('continueBtn').addEventListener('click', function(){
+    var hasFlag = points.some(function(p){ return state[p] === 'flag'; });
+    var hasRemark = remarksEl.value.trim().length > 0;
+    if (hasFlag && !hasRemark) {
+      popupEl.classList.add('show');
+      remarksEl.classList.add('needs-input');
+      return;
+    }
+    document.getElementById('advanceOverlay').classList.add('show');
+  });
+  document.getElementById('popupOk').addEventListener('click', function(){
+    popupEl.classList.remove('show');
+    remarksEl.focus();
+  });
+  remarksEl.addEventListener('input', function(){
+    if (remarksEl.value.trim().length > 0) remarksEl.classList.remove('needs-input');
+    saveDraft();
+  });
+
+  updateProgress();
+</script>
+</body>
+</html>
